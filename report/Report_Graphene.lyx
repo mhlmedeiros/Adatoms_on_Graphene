@@ -1,0 +1,907 @@
+#LyX 2.2 created this file. For more info see http://www.lyx.org/
+\lyxformat 508
+\begin_document
+\begin_header
+\save_transient_properties true
+\origin unavailable
+\textclass article
+\use_default_options true
+\maintain_unincluded_children false
+\language english
+\language_package default
+\inputencoding auto
+\fontencoding global
+\font_roman "default" "default"
+\font_sans "default" "default"
+\font_typewriter "default" "default"
+\font_math "auto" "auto"
+\font_default_family default
+\use_non_tex_fonts false
+\font_sc false
+\font_osf false
+\font_sf_scale 100 100
+\font_tt_scale 100 100
+\graphics default
+\default_output_format default
+\output_sync 0
+\bibtex_command default
+\index_command default
+\paperfontsize default
+\spacing single
+\use_hyperref false
+\papersize default
+\use_geometry true
+\use_package amsmath 1
+\use_package amssymb 1
+\use_package cancel 1
+\use_package esint 1
+\use_package mathdots 1
+\use_package mathtools 1
+\use_package mhchem 1
+\use_package stackrel 1
+\use_package stmaryrd 1
+\use_package undertilde 1
+\cite_engine basic
+\cite_engine_type default
+\biblio_style plain
+\use_bibtopic false
+\use_indices false
+\paperorientation portrait
+\suppress_date false
+\justification true
+\use_refstyle 1
+\index Index
+\shortcut idx
+\color #008000
+\end_index
+\leftmargin 25mm
+\rightmargin 25mm
+\secnumdepth 3
+\tocdepth 3
+\paragraph_separation indent
+\paragraph_indentation default
+\quotes_language english
+\papercolumns 1
+\papersides 1
+\paperpagestyle default
+\tracking_changes false
+\output_changes false
+\html_math_output 0
+\html_css_as_file 0
+\html_be_strict false
+\end_header
+
+\begin_body
+
+\begin_layout Title
+Weak localization in Hydrogenated Graphene
+\end_layout
+
+\begin_layout Section
+Introduction
+\end_layout
+
+\begin_layout Subsection
+Weak localization
+\end_layout
+
+\begin_layout Section
+Tight-binding model
+\end_layout
+
+\begin_layout Standard
+To explore this system we are going to adopt a tight-binding formulation
+ given by the reference [PRL 110, 246602(2013)].
+ Basically our model can be splitted in two parts: an orbital and a spin-orbit
+ couping part,
+\end_layout
+
+\begin_layout Standard
+\begin_inset Formula 
+\begin{equation}
+H=H_{\text{orb}}+H_{\text{so}}\label{eq:Hamiltonian_general}
+\end{equation}
+
+\end_inset
+
+In what follows we have adopted the notation where 
+\begin_inset Formula $c_{i\sigma}^{\dagger}=(a_{i\sigma}^{\dagger},b_{i\sigma}^{\dagger})$
+\end_inset
+
+ and 
+\begin_inset Formula $c_{i\sigma}=(a_{i\sigma},b_{i\sigma})$
+\end_inset
+
+ represent the creation and annihilation operators for the 
+\begin_inset Formula $p_{z}$
+\end_inset
+
+-orbitals on both A and B graphene sublattices.
+ The creation and annihilation operators for the Hydrogen 
+\begin_inset Formula $s$
+\end_inset
+
+-orbitals located at the site 
+\begin_inset Formula $m$
+\end_inset
+
+ are given respectivelly by 
+\begin_inset Formula $h_{m\sigma}^{\dagger}$
+\end_inset
+
+ and 
+\begin_inset Formula $h_{m\sigma}$
+\end_inset
+
+.
+ The orbital part of 
+\begin_inset CommandInset ref
+LatexCommand ref
+reference "eq:Hamiltonian_general"
+
+\end_inset
+
+ is given by 
+\end_layout
+
+\begin_layout Standard
+\begin_inset Formula 
+\begin{equation}
+H_{\text{orb}}=\varepsilon_{h}\sum_{m}h_{m\sigma}^{\dagger}h_{m\sigma}-t\sum_{\langle i,j\rangle}c_{i\sigma}^{\dagger}c_{j\sigma}+T\sum_{\langle m,i\rangle}h_{m\sigma}^{\dagger}c_{i\sigma}+\text{\text{h.c}.}
+\end{equation}
+
+\end_inset
+
+where 
+\end_layout
+
+\begin_layout Itemize
+\begin_inset Formula $\varepsilon_{h}=3$
+\end_inset
+
+ eV is the adatom on-site energy, which could be fitted from first-principles
+ band structure for 
+\begin_inset Formula $\Delta/a=14\%$
+\end_inset
+
+ (distortion in the single-adatom limit).
+\end_layout
+
+\begin_layout Itemize
+\begin_inset Formula $T=6.5$
+\end_inset
+
+ eV is the Hydrogen-Carbon hopping term, which was also obtained by fitting.
+\end_layout
+
+\begin_layout Itemize
+\begin_inset Formula $t=2.6$
+\end_inset
+
+ eV, is the hopping term between the Carbon atoms, Ref.'s [30] and [36] os
+ PRL 110, 246602(2013).
+\end_layout
+
+\begin_layout Standard
+The spin-orbit coupling part can be written as
+\end_layout
+
+\begin_layout Standard
+\begin_inset Formula 
+\[
+H_{\text{so}}=\frac{2i}{3}\sum_{\langle i,j\rangle}c_{i\sigma}^{\dagger}c_{j\sigma^{\prime}}\left[\Lambda_{\text{BR}}(\mathbf{s}\times\mathbf{d}_{ij})\right]_{\sigma\sigma^{\prime}}+\frac{i}{3}\sum_{\langle\langle i,j\rangle\rangle}c_{i\sigma}^{\dagger}c_{j\sigma}\left[\frac{\Lambda_{I}^{c}}{\sqrt{3}}\nu_{ij}\hat{s}_{z}+2\Lambda_{\text{PIA}}^{c}(\mathbf{s}\times\mathbf{D}_{ij})_{z}\right]_{\sigma\sigma^{\prime}}
+\]
+
+\end_inset
+
+where
+\end_layout
+
+\begin_layout Itemize
+\begin_inset Formula $\Lambda_{\text{BR}}$
+\end_inset
+
+: Bychkov-Rashba term
+\end_layout
+
+\begin_layout Itemize
+\begin_inset Formula $\Lambda_{I}^{A}$
+\end_inset
+
+, 
+\begin_inset Formula $\Lambda_{I}^{B}$
+\end_inset
+
+: intrinsic SOC, which depends on the sublattice
+\end_layout
+
+\begin_layout Itemize
+\begin_inset Formula $\Lambda_{\text{PIA}}^{A}$
+\end_inset
+
+, 
+\begin_inset Formula $\Lambda_{\text{PIA}}^{B}$
+\end_inset
+
+: new SOC due to pseudospin inversion asymmetry
+\end_layout
+
+\begin_layout Itemize
+\begin_inset Formula $\nu_{ij}=1$
+\end_inset
+
+ for counter-clockwise path from 
+\begin_inset Formula $j$
+\end_inset
+
+ to 
+\begin_inset Formula $i$
+\end_inset
+
+
+\end_layout
+
+\begin_layout Itemize
+\begin_inset Formula $\nu_{ij}=-1$
+\end_inset
+
+ for clockwise path from 
+\begin_inset Formula $j$
+\end_inset
+
+ to 
+\begin_inset Formula $i$
+\end_inset
+
+
+\end_layout
+
+\begin_layout Itemize
+\begin_inset Formula $\mathbf{d}_{ij}$
+\end_inset
+
+: nearest-neighbor unit vector from 
+\begin_inset Formula $j$
+\end_inset
+
+ to 
+\begin_inset Formula $i$
+\end_inset
+
+
+\end_layout
+
+\begin_layout Itemize
+\begin_inset Formula $\mathbf{D}_{ij}$
+\end_inset
+
+: next-nearest-neighbor unit vector from 
+\begin_inset Formula $j$
+\end_inset
+
+ to 
+\begin_inset Formula $i$
+\end_inset
+
+
+\end_layout
+
+\begin_layout Subsection
+Single-adatom limit
+\end_layout
+
+\begin_layout Standard
+In this case, the minimal realistic model for SOC has its effects confined
+ up to the second-nearest neighbors of the hydronated site 
+\begin_inset Formula $C_{H}$
+\end_inset
+
+ (in sublattice A), which defines our impurity region.
+ Defining 
+\begin_inset Formula $A_{\sigma}^{\dagger}$
+\end_inset
+
+ 
+\begin_inset Formula $(A_{\sigma})$
+\end_inset
+
+ as the creation (annihilation) operator on 
+\begin_inset Formula $C_{H}$
+\end_inset
+
+ and 
+\begin_inset Formula $B_{m\sigma}^{\dagger}$
+\end_inset
+
+ 
+\begin_inset Formula $(B_{m\sigma})$
+\end_inset
+
+ as the creation (annihilation) operator on the three nearest neighbors
+ of 
+\begin_inset Formula $C_{H}$
+\end_inset
+
+.
+ The tight-binding Hamiltonian can be written as
+\end_layout
+
+\begin_layout Standard
+\begin_inset Formula 
+\begin{align*}
+H_{\text{so}} & =\frac{i}{3}\sum_{\langle\langle i,j\rangle\rangle}^{\prime}c_{i\sigma}^{\dagger}c_{j\sigma^{\prime}}\left[\frac{\lambda_{I}}{\sqrt{3}}\nu_{ij}\hat{s}_{z}\right]_{\sigma\sigma^{\prime}}\\
+ & +\frac{i}{3}\sum_{\langle\langle C_{H},j\rangle\rangle}A_{\sigma}^{\dagger}c_{j\sigma^{\prime}}\left[\frac{\Lambda_{I}}{\sqrt{3}}\nu_{C_{H},j}\hat{s}_{z}\right]_{\sigma\sigma^{\prime}}\\
+ & +\frac{2i}{3}\sum_{\langle C_{H},j\rangle}A_{\sigma}^{\dagger}B_{j\sigma^{\prime}}\left[\Lambda_{\text{BR}}(\hat{\mathbf{s}}\times\mathbf{d}_{C_{H},j})_{z}\right]_{\sigma\sigma^{\prime}}+\text{h.c.}\\
+ & +\frac{2i}{3}\sum_{\langle\langle i,j\rangle\rangle}B_{i\sigma}^{\dagger}B_{j\sigma^{\prime}}\left[\Lambda_{\text{PIA}}(\hat{\mathbf{s}}\times\mathbf{D}_{i,j})_{z}\right]_{\sigma\sigma^{\prime}}
+\end{align*}
+
+\end_inset
+
+where the individual terms and parameters assume the following interpretation
+ and values:
+\end_layout
+
+\begin_layout Itemize
+The first term models the intrinsic spin-orbit coupling for the Graphene,
+ and it is characterized by 
+\begin_inset Formula $2\lambda_{I}=24$
+\end_inset
+
+ 
+\begin_inset Formula $\mu$
+\end_inset
+
+eV.
+ It couples every next-nearest-neighbor pairs that do not contain 
+\begin_inset Formula $C_{H}$
+\end_inset
+
+ (indicated by the prime).
+\end_layout
+
+\begin_layout Itemize
+The second term indicates the adatom-induced intrinsic SOC, and it's strength
+ is given by 
+\begin_inset Formula $\Lambda_{I}=-0.21$
+\end_inset
+
+ meV (17 times stronger than 
+\begin_inset Formula $\lambda_{I}$
+\end_inset
+
+).
+ It couples the same spin in the same sublattice.
+\end_layout
+
+\begin_layout Itemize
+The third term is the Bychkov-Rashba term, which induces the nearest neighbors
+ spin-flip.
+ The value of 
+\begin_inset Formula $\Lambda_{\text{BR}}=0.33$
+\end_inset
+
+ meV is more than 60 times stronger than the value for Graphene in a representat
+ive electric field of 
+\begin_inset Formula $1$
+\end_inset
+
+ V/nm (
+\begin_inset Formula $\lambda_{\text{BR}}=5$
+\end_inset
+
+ 
+\begin_inset Formula $\mu$
+\end_inset
+
+eV).
+\end_layout
+
+\begin_layout Itemize
+The last term comes from the pseudo-spin asymmetry and couples different
+ spin from next-nearest-neighbors.
+ The value of 
+\begin_inset Formula $\Lambda_{\text{PIA}}=-0.77$
+\end_inset
+
+ meV has no couterpart in flat Graphene.
+\end_layout
+
+\begin_layout Section
+Preliminar results
+\end_layout
+
+\begin_layout Standard
+The main subject of this study is a two-dimensional strip of Graphene with
+ Hydrogen adatoms in one side of the strip.
+ To start the investigation, let us focus on a simple Graphene strip as
+ depicted in the figure (
+\begin_inset CommandInset ref
+LatexCommand ref
+reference "fig:Zig-zag-Graphene-strip"
+
+\end_inset
+
+).
+\end_layout
+
+\begin_layout Standard
+\begin_inset Float figure
+wide false
+sideways false
+status open
+
+\begin_layout Plain Layout
+\align center
+\begin_inset Graphics
+	filename /home/marcos/Documents/DAAD_Research/quantum_transport/hydrogenated_graphene/images/Graphene_strip_example.png
+	width 80col%
+	BoundingBox 0cm 0bp 1080bp 360bp
+	clip
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Plain Layout
+\begin_inset Caption Standard
+
+\begin_layout Plain Layout
+Zig-zag Graphene strip connected to semi-infinite leads on the left and
+ on the right.
+\begin_inset CommandInset label
+LatexCommand label
+name "fig:Zig-zag-Graphene-strip"
+
+\end_inset
+
+
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+To introduxe an out-of-plane magnetic field into our system, we have implemented
+ the Peierls substitution, where the original hoppings are replaced by 
+\end_layout
+
+\begin_layout Standard
+\begin_inset Formula 
+\begin{equation}
+t_{i,j}\rightarrow t_{i,j}e^{i\phi_{ij}}
+\end{equation}
+
+\end_inset
+
+where the Peierls phase is defined by
+\end_layout
+
+\begin_layout Standard
+\begin_inset Formula 
+\begin{equation}
+\phi_{ij}=\frac{e}{\hbar}\int_{\mathbf{r}_{i}}^{\mathbf{r}_{j}}\mathbf{A}\cdot d\mathbf{l}
+\end{equation}
+
+\end_inset
+
+with 
+\begin_inset Formula $\mathbf{A}$
+\end_inset
+
+ being the vector potential, and 
+\begin_inset Formula $\mathbf{r}_{i}$
+\end_inset
+
+ the position of the i-th atom.
+ To get a zero magnetic field in the leads, and a magnetic field pointing
+ in z-direction we adopt the Landau gauge given by
+\end_layout
+
+\begin_layout Standard
+\begin_inset Formula 
+\begin{equation}
+\mathbf{A}(\mathbf{r})=\hat{\mathbf{y}}B\bar{x}
+\end{equation}
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\begin_inset Formula 
+\begin{equation}
+\bar{x}=\begin{cases}
+\begin{array}{c}
+0,\\
+x,\\
+d,
+\end{array} & \begin{array}{c}
+x<0\\
+0\leq x\leq d\\
+x>d
+\end{array}\end{cases}.
+\end{equation}
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Notice that the vector potential can not be set to zero in the 
+\begin_inset Formula $x>d$
+\end_inset
+
+ region, as this would imply an infinite magnetic field at the 
+\begin_inset Formula $x=d$
+\end_inset
+
+ interface.
+\end_layout
+
+\begin_layout Section
+Results
+\end_layout
+
+\begin_layout Standard
+\begin_inset Float figure
+wide false
+sideways false
+status open
+
+\begin_layout Plain Layout
+\align center
+\begin_inset Graphics
+	filename /home/marcos/Documents/DAAD_Research/quantum_transport/hydrogenated_graphene/jupyter_notebooks/conductance_wo_adatom_comparison_with_B.png
+	lyxscale 40
+	width 90col%
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Plain Layout
+\begin_inset Caption Standard
+
+\begin_layout Plain Layout
+Comparison between systems with and without magnetic field.
+ 
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\begin_inset Float figure
+wide false
+sideways false
+status open
+
+\begin_layout Plain Layout
+\align center
+\begin_inset Graphics
+	filename /home/marcos/Documents/DAAD_Research/quantum_transport/hydrogenated_graphene/jupyter_notebooks/conductance_with_adatom_comparison_with_B_and_wo_adatom.png
+	lyxscale 40
+	width 90col%
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Plain Layout
+\begin_inset Caption Standard
+
+\begin_layout Plain Layout
+Comparison between systems with a single Adatom in the middle, with and
+ without magnetic field.
+ 
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Plain Layout
+
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\begin_inset Float figure
+wide false
+sideways false
+status open
+
+\begin_layout Plain Layout
+\align center
+\begin_inset Graphics
+	filename /home/marcos/Documents/DAAD_Research/quantum_transport/hydrogenated_graphene/jupyter_notebooks/system_long.png
+	lyxscale 40
+	width 90col%
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Plain Layout
+\begin_inset Caption Standard
+
+\begin_layout Plain Layout
+Representation of the system adopted in the density of states calculations.
+ Here we have the leads
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\begin_inset Float figure
+wide false
+sideways false
+status open
+
+\begin_layout Plain Layout
+\align center
+\begin_inset Graphics
+	filename /home/marcos/Documents/DAAD_Research/quantum_transport/hydrogenated_graphene/jupyter_notebooks/total_dos_comparison.png
+	lyxscale 40
+	width 80col%
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Plain Layout
+\begin_inset Caption Standard
+
+\begin_layout Plain Layout
+Total density of states comparison between the systems with and withou the
+ adatom.
+ Both the systems have a rectangular shape and zig zag bouraries.
+ The adatom was placed on top of the Carbon atom at the origin of the coordinate
+ system, which is approximately the center of the system.
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Plain Layout
+
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\begin_inset Float figure
+wide false
+sideways false
+status open
+
+\begin_layout Plain Layout
+\align center
+\begin_inset Graphics
+	filename /home/marcos/Documents/DAAD_Research/quantum_transport/hydrogenated_graphene/jupyter_notebooks/ldos_at_center_comparison.png
+	lyxscale 40
+	width 90col%
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Plain Layout
+\begin_inset Caption Standard
+
+\begin_layout Plain Layout
+Local density of states (LDOS) for the position 
+\begin_inset Formula $\vec{r}=0$
+\end_inset
+
+.
+ In blue we have the results for the system without the adatom while the
+ red line shows the results for the system with the adatom positioned at
+ the center.
+ The important features here is the presence of the peak for energy zero,
+ and the very high peaks at the both ends of the energy range.
+ 
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Plain Layout
+
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\begin_inset Float figure
+wide false
+sideways false
+status open
+
+\begin_layout Plain Layout
+\align center
+\begin_inset Graphics
+	filename /home/marcos/Documents/DAAD_Research/quantum_transport/hydrogenated_graphene/jupyter_notebooks/ldos_E_0_and_E_1_without_adatom.png
+	lyxscale 40
+	width 90col%
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Plain Layout
+\begin_inset Caption Standard
+
+\begin_layout Plain Layout
+Color map for the local density of states for the system without adatom.
+ In the panel (a) we have the mapping for 
+\begin_inset Formula $E=0$
+\end_inset
+
+, and in (b) we have the mapping for the 
+\begin_inset Formula $E=1$
+\end_inset
+
+ eV.
+ 
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Plain Layout
+
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\begin_inset Float figure
+wide false
+sideways false
+status open
+
+\begin_layout Plain Layout
+\align center
+\begin_inset Graphics
+	filename /home/marcos/Documents/DAAD_Research/quantum_transport/hydrogenated_graphene/jupyter_notebooks/ldos_E_0_and_E_9,17_with_adatom.png
+	lyxscale 40
+	width 90col%
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Plain Layout
+\begin_inset Caption Standard
+
+\begin_layout Plain Layout
+Local density of states for the system with a Hydrogen adatom in the center.
+ The panel (a) shows the results for 
+\begin_inset Formula $E=0$
+\end_inset
+
+, while the panel (b) presents the mapping for energy corresponding to the
+ highest value of density 
+\begin_inset Formula $E=9.17$
+\end_inset
+
+ eV.
+ 
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Plain Layout
+
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+
+\end_layout
+
+\begin_layout Standard
+\begin_inset Float figure
+wide false
+sideways false
+status open
+
+\begin_layout Plain Layout
+\align center
+\begin_inset Graphics
+	filename /home/marcos/Documents/DAAD_Research/quantum_transport/hydrogenated_graphene/jupyter_notebooks/ldos_E_0_and_E_9,17_adatom_B.png
+	lyxscale 40
+	width 90col%
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Plain Layout
+\begin_inset Caption Standard
+
+\begin_layout Plain Layout
+Local density of states for the system in the presence of magnetic field.
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Plain Layout
+
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Section
+Conclusions
+\end_layout
+
+\end_body
+\end_document

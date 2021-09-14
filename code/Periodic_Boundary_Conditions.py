@@ -95,6 +95,58 @@ def make_system(N1=10, N2=20, pot=0, t=2.6):
 
     return syst
 
+def insert_adatoms_soc(system, n_cells_a1, n_cells_a2, adatom_concentration, params):
+
+    ## INSERTING ADATOMS:
+    test_pbc = Permition_PBC(n_cells_a1, n_cells_a2, delta=2)
+    print("Collecting the allowed sites to place adatoms...", end=' ')
+    allowed_sites_pbc = [site for site in system.sites() if test_pbc.is_allowed(site)]
+    print("OK")
+
+    print("Inserting adatoms randomly...", end=' ')
+    n_Carbon_sites = n_cells_a1 * n_cells_a2 * 2
+    n_Hydrogen_sites = int(n_Carbon_sites // (100/adatom_concentration))
+    number_of_adatoms_pbc = max(2, n_Hydrogen_sites)
+    list_of_A_adatom_sites_pbc, list_of_B_adatom_sites_pbc, allowed_sites_pbc_2 = get_adatom_positions_balanced(
+                                                                        number_of_adatoms_pbc,
+                                                                        allowed_sites_pbc)
+    A_adatoms_tags_pbc = [site.tag for site in list_of_A_adatom_sites_pbc]
+    B_adatoms_tags_pbc = [site.tag for site in list_of_B_adatom_sites_pbc]
+    CH_sites_pbc = list_of_A_adatom_sites_pbc + list_of_B_adatom_sites_pbc
+
+    all_neighbors_pbc = [get_neighbors(system, CH, [a,b]) for CH in CH_sites_pbc]
+    all_NN_neighbors_pbc = [a[0] for a in all_neighbors_pbc]
+    all_NNN_neighbors_pbc = [a[1] for a in all_neighbors_pbc]
+
+    T = params['T']          #  5.5 eV Fluorine,  7.5 eV Hydrogen: ADATOM-CARBON HOPPING
+    epsilon = params['eps']  # -2.2 eV Fluorine, 0.16 eV Hydrogen: ON-SITE ENERGY FOR ADATOM
+
+    for tagA in A_adatoms_tags_pbc:
+        system[ha(*tagA)] = sigma_0 * epsilon     # on-site
+        system[a(*tagA), ha(*tagA)] = sigma_0 * T # hopping with C_H
+
+    for tagB in B_adatoms_tags_pbc:
+        system[hb(*tagB)] = sigma_0 * epsilon     # on-site
+        system[b(*tagB), hb(*tagB)] = sigma_0 * T # hopping with C_H
+
+    print("OK")
+
+    print("Considering the SOC terms...", end=" ")
+    ## Calculate and include the Adatom induced spin-orbit coupling (ASO)
+    include_all_ASO(system, CH_sites_pbc, all_NNN_neighbors_pbc, Lambda_I=params['Lambda_I'])
+
+    ## Calculate and include into the system the Bychkov-Rashba spin-orbit coupling (BR)
+    include_all_BR(system, CH_sites_pbc, all_NN_neighbors_pbc, Lambda_BR=params['Lambda_BR'])
+
+    ## Calculate and include into the system the Pseudo-spin inversion asymmetry spin-orbit coupling (PIA)
+    include_all_PIA(system, all_NN_neighbors_pbc, Lambda_PIA=params['Lambda_PIA'], iso=False)
+    print("OK")
+
+    print("Formating sites for plotting...", end=' ')
+    format_sites_3 = FormatMapSites(allowed_sites_pbc_2, CH_sites_pbc)
+    print("OK")
+    return system
+
 def insert_adatoms(system, adatom_concentration, n_cells_a1, n_cells_a2, verbatim=True):
     n_Carbon_sites = n_cells_a1 * n_cells_a2 * 2
     n_Hydrogen_sites = int(n_Carbon_sites // (100/adatom_concentration))
@@ -376,11 +428,11 @@ def include_all_PIA(system, all_NN_neighbors, Lambda_PIA=1, iso=True):
 
 
 ## CALCULATE DENSITY OF STATES:
-def dos_kpm(system, energies, additional_vectors=50, resolution=0.03):
+def dos_kpm(system, energies, additional_vectors=50, resolution=None):
     fsystem = system.finalized()
     spectrum = kwant.kpm.SpectralDensity(fsystem)
     spectrum.add_vectors(additional_vectors)
-    spectrum.add_moments(energy_resolution=resolution)
+    if resolution: spectrum.add_moments(energy_resolution=resolution)
     density_kpm = spectrum(energies)
     return density_kpm
 
@@ -451,98 +503,53 @@ def site_size_function(site):
         size = 0.1
     return size
 
+def plor_system_format(system):
+    print("Plotting...", end=' ')
+    ## Figure
+    fig, ax = plt.subplots(figsize=(20,5))
+    # kwant.plot(system,
+    #            site_color=format_sites_3.color,
+    #            hop_color=hopping_colors,
+    #            hop_lw=hopping_lw,
+    #            site_lw=format_sites_3.line_width,
+    #            ax=ax)
+    kwant.plot(system,
+               site_size = site_size_function,
+               site_color=family_colors_H,
+               hop_color=hopping_colors,
+               hop_lw=hopping_lw,
+               site_lw=format_sites_3.line_width,
+               ax=ax)
+    ax.set_aspect('equal')
+    ax.axis('off')
+    ax.set_title('Possible location for Adatoms in orange', fontsize=20)
+    plt.show()
+    print("OK")
+
 
 def main():
     n_cells_a1 = 300
     n_cells_a2 = 300
     adatom_concentration = 0.125  # [% of Carbon atoms]
-    n_Carbon_sites = n_cells_a1 * n_cells_a2 * 2
-    n_Hydrogen_sites = int(n_Carbon_sites // (100/adatom_concentration))
-
 
     ## BUILDING PRISTINE SYSTEM:
     system = make_system(N1=n_cells_a1, N2=n_cells_a2, pot=0, t=2.6)
 
     ## CALCULATING THE DENSITY OF STATES:
     energies = np.linspace(-0.5, 0.5, 501)
-    density_pristine = dos_kpm(system, energies)
+    # density_pristine = dos_kpm(system, energies, resolution=0.03)
+    # np.savez('../results/dos/density_of_states_pristine_pbc_300x300_resolution_0,03.npz', energies=energies, density=density_pristine)
 
     ## INSERTING ADATOMS:
-    test_pbc = Permition_PBC(n_cells_a1, n_cells_a2, delta=2)
-    print("Collecting the allowed sites to place adatoms...", end=' ')
-    allowed_sites_pbc = [site for site in system.sites() if test_pbc.is_allowed(site)]
-    print("OK")
-
-    print("Inserting adatoms randomly...", end=' ')
-    number_of_adatoms_pbc = max(2, n_Hydrogen_sites)
-    list_of_A_adatom_sites_pbc, list_of_B_adatom_sites_pbc, allowed_sites_pbc_2 = get_adatom_positions_balanced(
-                                                                        number_of_adatoms_pbc,
-                                                                        allowed_sites_pbc)
-    A_adatoms_tags_pbc = [site.tag for site in list_of_A_adatom_sites_pbc]
-    B_adatoms_tags_pbc = [site.tag for site in list_of_B_adatom_sites_pbc]
-    CH_sites_pbc = list_of_A_adatom_sites_pbc + list_of_B_adatom_sites_pbc
-
-    all_neighbors_pbc = [get_neighbors(system, CH, [a,b]) for CH in CH_sites_pbc]
-    all_NN_neighbors_pbc = [a[0] for a in all_neighbors_pbc]
-    all_NNN_neighbors_pbc = [a[1] for a in all_neighbors_pbc]
-
-    T = 5.5          # ADATOM-CARBON HOPPING
-    epsilon = -2.2   # ON-SITE ENERGY FOR ADATOM
-
-    for tagA in A_adatoms_tags_pbc:
-        system[ha(*tagA)] = sigma_0 * epsilon     # on-site
-        system[a(*tagA), ha(*tagA)] = sigma_0 * T # hopping with C_H
-
-    for tagB in B_adatoms_tags_pbc:
-        system[hb(*tagB)] = sigma_0 * epsilon     # on-site
-        system[b(*tagB), hb(*tagB)] = sigma_0 * T # hopping with C_H
-
-    print("OK")
-
-    print("Considering the SOC terms...", end=" ")
-    ## Calculate and include the Adatom induced spin-orbit coupling (ASO)
-    # include_all_ASO(system, CH_sites_pbc, all_NNN_neighbors_pbc, Lambda_I=-0.21e-3)
-    include_all_ASO(system, CH_sites_pbc, all_NNN_neighbors_pbc, Lambda_I=3.3e-3)
-
-    ## Calculate and include into the system the Bychkov-Rashba spin-orbit coupling (BR)
-    # include_all_BR(system, CH_sites_pbc, all_NN_neighbors_pbc, Lambda_BR=0.33e-3)
-    include_all_BR(system, CH_sites_pbc, all_NN_neighbors_pbc, Lambda_BR=11.2e-3)
-
-    ## Calculate and include into the system the Pseudo-spin inversion asymmetry spin-orbit coupling (PIA)
-    # include_all_PIA(system, all_NN_neighbors_pbc, Lambda_PIA=-0.77e-3, iso=False)
-    include_all_PIA(system, all_NN_neighbors_pbc, Lambda_PIA=-7.3e-3, iso=False)
-    print("OK")
-
-    print("Preparing formatat for sites...", end=' ')
-    format_sites_3 = FormatMapSites(allowed_sites_pbc_2, CH_sites_pbc)
-    print("OK")
-
-    # print("Plotting...", end=' ')
-    # ## Figure
-    # fig, ax = plt.subplots(figsize=(20,5))
-    # # kwant.plot(system,
-    # #            site_color=format_sites_3.color,
-    # #            hop_color=hopping_colors,
-    # #            hop_lw=hopping_lw,
-    # #            site_lw=format_sites_3.line_width,
-    # #            ax=ax)
-    # kwant.plot(system,
-    #            site_size = site_size_function,
-    #            site_color=family_colors_H,
-    #            hop_color=hopping_colors,
-    #            hop_lw=hopping_lw,
-    #            site_lw=format_sites_3.line_width,
-    #            ax=ax)
-    # ax.set_aspect('equal')
-    # ax.axis('off')
-    # ax.set_title('Possible location for Adatoms in orange', fontsize=20)
-    # plt.show()
-    # print("OK")
-
+    adatom_H_params = dict(T = 7.5, eps = 0.16, Lambda_I = -0.21e-3, Lambda_BR = 0.33e-3, Lambda_PIA = -0.77e-3)
+    adatom_F_params = dict(T = 5.5, eps = -2.2, Lambda_I = 3.3e-3, Lambda_BR = 11.2e-3, Lambda_PIA = -7.3e-3)
+    system = insert_adatoms_soc(system, n_cells_a1, n_cells_a2, adatom_concentration, params=adatom_F_params)
     # system = insert_adatoms(system, adatom_concentration, n_cells_a1, n_cells_a2)
-    density_adatoms = dos_kpm(system, energies)
-    plot_density_of_states(energies, density_pristine, density_adatoms)
 
+    density_adatoms = dos_kpm(system, energies, resolution=0.03)
+    np.savez('../results/dos/density_of_states_with_0,125_F_adatoms_pbc_300x300_resolution_0,03.npz', energies=energies, density=density_adatoms)
+
+    # plot_density_of_states(energies, density_pristine, density_adatoms)
 
 
 

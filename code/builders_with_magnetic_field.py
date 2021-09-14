@@ -36,16 +36,32 @@ class Rectangle:
 
 ## Limited region with magnetic field:
 class Bfield:
-   def __init__(self, Bvalue, Length_centered):
+   def __init__(self, Bvalue, length=None):
+       """
+       This class creates functions that return the value for the magnetic
+       field depending on x-coordinate. The magnetic field returned is uniform
+       inside a symmetrical interval
+
+                -length/2 <= x <= length/2
+
+       and zero otherwise.
+
+       If the length is not informed, the magnetic field will be constant and
+       uniform for the whole system. The choice between these options has to
+       be made alongside the choice of the gauge.
+       """
        self.Bvalue = Bvalue
-       self.L = Length_centered
+       self.L = length
 
    def __call__(self, x, y):
-       return self.Bvalue if np.abs(x) <= self.L/2 else 0
+       if self.length:
+           return self.Bvalue if np.abs(x) <= self.L/2 else 0
+       else:
+           return self.Bvalue
 
 
 ## Hopping function's builder:
-class HoppingFunction(object):
+class HoppingFunction:
 
     def __init__(self, B_0_hopping, sign):
         self.B_0_hopping = B_0_hopping
@@ -105,20 +121,20 @@ def on_site_with_Zeeman(site, V, B, Lm):
     effect.
     """
     x, y = site.pos
-    Bfunc = Bfield(Bvalue=B, Length_centered=Lm)
+    Bfunc = Bfield(Bvalue=B, length=Lm)
     H_Z = g_Lande * Magneton_Bohr/2 * Bfunc(x,y) * sigma_z
     return V * sigma_0 + H_Z
 
 def on_site_H_with_Zeeman(site, eps_H, B, Lm):
     """
-    This function defines the on-site energy by
-    allowing to pass functions of position for
-    the electrical potential and the magnetic field
-    separately in order to account for the Zeeman
-    effect.
+    This function is essentially a copy of 'on_site_with_Zeeman' with the
+    difference that here, the on-site energy is given by
+        * eps_H = on-site energy for the adatoms
+    instead of
+        * V = on-site for the carbon atoms
     """
     x, y = site.pos
-    Bfunc = Bfield(Bvalue=B, Length_centered=Lm)
+    Bfunc = Bfield(Bvalue=B, length=Lm)
     H_Z = g_Lande * Magneton_Bohr/2 * Bfunc(x,y) * sigma_z
     return eps_H * sigma_0 + H_Z
 
@@ -127,40 +143,66 @@ def on_site_H_with_Zeeman(site, eps_H, B, Lm):
 def hopping_by_hand(Site1, Site2, t, B, Lm, peierls):
     return -t * sigma_0 * peierls(Site1, Site2, B, Lm)
 
-def peierls_1(Site1, Site2, B, Lm):
+def peierls_scatter(Site1, Site2, B, Lm):
+    """
+    This phase factor correspond to the gauge where the magnetic
+    field is limitted to a interval inside the scattering region.
+    """
     (x_i, y_i) = Site1.pos # Target
     (x_j, y_j) = Site2.pos # Source
-    x_i, x_j = change_x(x_i, Lm), change_x(x_j, Lm)
-    theta = B/2 * (x_i + x_j) * (y_i - y_j)
-    return np.exp(-1j*theta)
+    if Lm:
+        x_i, x_j = change_x(x_i, Lm), change_x(x_j, Lm)
+        theta = B/2 * (x_i + x_j) * (y_i - y_j)
+    else:
+        theta = -B/2 * (x_i - x_j) * (y_i + y_j)
+    return np.exp(2j*np.pi*theta)
 
 def peierls_lead_L(Site1, Site2, B, Lm):
+    """
+    When 'peierls_scatter' is used, this has to be the
+    the phase factor for left-hand lead.
+    """
     (x_i, y_i) = Site1.pos # Target
     (x_j, y_j) = Site2.pos # Source
-    theta = -B/2 * Lm * (y_i - y_j)
-    return np.exp(-1j*theta)
+    if Lm: theta = B/2 * Lm * (y_i - y_j)
+    else: theta = -B/2 * (x_i - x_j) * (y_i + y_j)
+    return np.exp(2j*np.pi*theta)
 
 def peierls_lead_R(Site1, Site2, B, Lm):
+    """
+    When 'peierls_scatter' is used, this has to be the
+    the phase factor for right-hand lead.
+    """
     (x_i, y_i) = Site1.pos # Target
     (x_j, y_j) = Site2.pos # Source
-    theta = B/2 * Lm * (y_i - y_j)
-    return np.exp(-1j*theta)
+    if Lm: theta = B/2 * Lm * (y_i - y_j)
+    else: theta = -B/2 * (x_i - x_j) * (y_i + y_j)
+    return np.exp(-2j*np.pi*theta)
 
 def change_x(x, Lm):
-    if (-Lm/2) <= x <= (Lm/2): return x
-    elif x > (Lm/2): return Lm/2
-    else: return -Lm/2
+    if Lm:
+        if (-Lm/2) <= x <= (Lm/2): x_transformed = x
+        elif x > (Lm/2): x_transformed = Lm/2
+        else: x_transformed = -Lm/2
+    else:
+        x_transformed = x
+    return x_transformed
 
 
 ## Getting the neighboring sites
-def get_neighbors(system, C_H_site):
+def get_neighbors(system, C_H_site, CH_sublattices):
+    """
+    Returns a list containing 2 other lists:
+        - nn_list = list of nearest neighbors sites
+        - nnn_list = list of next nearest neighbors sites
+    """
     site_tag = C_H_site.tag
     site_sub = C_H_site.family
-    nn_list = get_nn(system, site_tag, site_sub)
+    nn_list = get_nn(system, site_tag, site_sub, CH_sublattices)
     nnn_list = get_nnn(system, site_tag, site_sub)
-    return nn_list, nnn_list
+    return [nn_list, nnn_list]
 
-def get_nn(system, tag, sub_s):
+def get_nn(system, tag, sub_s, list_sub_lat):
     """
     system := kwant.builder.Builder
     tag    := tuple (i,j) of the site's tag
@@ -168,17 +210,19 @@ def get_nn(system, tag, sub_s):
 
     Notice that
     """
-    list_sub_lat = [A, B]
-    list_sub_lat.remove(sub_s)
-    sub_nn, = list_sub_lat
+    list_sub_lat.remove(sub_s) # remove the sublattice to which the site belongs
+    sub_nn, = list_sub_lat     # extract the sublattice of the neighbors
     # print(sub_nn.name[-1])
     name_indx = int(sub_s.name[-1])
     delta = +1 if name_indx == 0 else -1
+#     print(delta)
     i,j = tag
     nn_tag_list = [(i,j), (i+delta,j-delta), (i,j-delta)]
     nn_sites = [
         sub_nn(*t) for t in nn_tag_list if sub_nn(*t) in system
     ]
+#     for site in nn_sites:
+#         print(site)
     return nn_sites
 
 def get_nnn(system, tag, sub_s):
@@ -202,7 +246,7 @@ def get_nnn(system, tag, sub_s):
 #         print(site)
     return nnn_sites
 
-
+## # TODO: UPDATE THE REST OF THE CODE STARTING HERE (14/09/2021) 
 #====================================================================#
 #                          System Builders                           #
 #====================================================================#
@@ -459,7 +503,7 @@ def main():
                            t=1,
                            B=0.5*np.pi,
                            eps_H=0.16,
-                           peierls=peierls_1,
+                           peierls=peierls_scatter,
                            peierls_lead_L=peierls_lead_L,
                            peierls_lead_R=peierls_lead_R,
                            Lm=3,

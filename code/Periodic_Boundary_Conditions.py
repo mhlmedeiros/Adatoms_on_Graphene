@@ -95,7 +95,6 @@ def make_system(N1=10, N2=20, pot=0, t=2.6):
 
     return syst
 
-
 def insert_adatoms(system, adatom_concentration, n_cells_a1, n_cells_a2, verbatim=True):
     n_Carbon_sites = n_cells_a1 * n_cells_a2 * 2
     n_Hydrogen_sites = int(n_Carbon_sites // (100/adatom_concentration))
@@ -117,7 +116,6 @@ def insert_adatoms(system, adatom_concentration, n_cells_a1, n_cells_a2, verbati
         system = insert_single_adatom(system, pos_adatom)
 
     return system
-
 
 def insert_single_adatom(system, pos_adatom, t=7.5, V=0.16):
     n1, n2 = pos_adatom
@@ -190,55 +188,8 @@ def neighboring_sites(adatom_site, list_of_sites, radius):
             list_of_neighboring_sites.append(site)
     return list_of_neighboring_sites
 
-## CALCULATE DENSITY OF STATES:
-def dos_kpm(system, energies, additional_vectors=50, resolution=0.03):
-    fsystem = system.finalized()
-    spectrum = kwant.kpm.SpectralDensity(fsystem)
-    spectrum.add_vectors(additional_vectors)
-    spectrum.add_moments(energy_resolution=resolution)
-    density_kpm = spectrum(energies)
-    return density_kpm
-
-
-def delta_approx(E, Em, eps):
-    return (eps/np.pi)/((E-Em)**2 + eps**2)
-
-
-def dos_manual(E_array, Eigenvalues, eps=0.1):
-    dos = np.zeros_like(E_array)
-    for Em in Eigenvalues:
-        dos += delta_approx(E_array, Em, eps)
-    return dos
-
-
-def plot_density_of_states(E, DOS_pristine, DOS_adatoms):
-    # fig, ax = plt.subplots(ncols=2, figsize=(8,8))
-    # ax[0].tick_params(labelsize=20)
-    # ax[0].plot(E, np.real(DOS_pristine), label='Pristine', color='k', linestyle='--')
-    # ax[0].plot(E, np.real(DOS_adatoms), label='Adatoms', color='C2', linestyle='-')
-    # ax[0].legend(fontsize=20)
-    # ax[0].set_xlabel(r'$E$ [eV]',fontsize=24)
-    # ax[0].set_ylabel('DOS [a.u.]',fontsize=24)
-    #
-    # ax[1].tick_params(labelsize=20)
-    # ax[1].plot(E, np.real(DOS_adatoms)-np.real(DOS_pristine), label='Difference', color='C2', linestyle='-')
-    # ax[1].legend(fontsize=20)
-    # ax[1].set_xlabel(r'$E$ [eV]',fontsize=24)
-    # ax[1].set_yticks([])
-    # plt.tight_layout(pad=0.1)
-    fig, ax = plt.subplots(figsize=(5,5))
-    ax.tick_params(labelsize=20)
-    ax.plot(E, np.real(DOS_pristine), label='Pristine', color='k', linestyle='--')
-    ax.plot(E, np.real(DOS_adatoms), label='Adatoms', color='C2', linestyle='-')
-    ax.legend(fontsize=20)
-    ax.set_xlabel(r'$E$ [eV]',fontsize=24)
-    ax.set_ylabel('DOS [a.u.]',fontsize=24)
-    plt.tight_layout()
-    plt.show()
-
 
 ## SPIN-ORBIT COUPLING DUE TO THE ADATOMS:
-
 def get_CH(system, CH_sublattices, H_sublattices):
     """
     system := kwant.builder.Builder
@@ -424,7 +375,49 @@ def include_all_PIA(system, all_NN_neighbors, Lambda_PIA=1, iso=True):
             include_PIA_sitewise(system, site1, site2, hop_list_PIA, Lambda_PIA, iso)
 
 
+## CALCULATE DENSITY OF STATES:
+def dos_kpm(system, energies, additional_vectors=50, resolution=0.03):
+    fsystem = system.finalized()
+    spectrum = kwant.kpm.SpectralDensity(fsystem)
+    spectrum.add_vectors(additional_vectors)
+    spectrum.add_moments(energy_resolution=resolution)
+    density_kpm = spectrum(energies)
+    return density_kpm
 
+def delta_approx(E, Em, eps):
+    return (eps/np.pi)/((E-Em)**2 + eps**2)
+
+def dos_manual(E_array, Eigenvalues, eps=0.1):
+    dos = np.zeros_like(E_array)
+    for Em in Eigenvalues:
+        dos += delta_approx(E_array, Em, eps)
+    return dos
+
+def plot_density_of_states(E, DOS_pristine, DOS_adatoms):
+    # fig, ax = plt.subplots(ncols=2, figsize=(8,8))
+    # ax[0].tick_params(labelsize=20)
+    # ax[0].plot(E, np.real(DOS_pristine), label='Pristine', color='k', linestyle='--')
+    # ax[0].plot(E, np.real(DOS_adatoms), label='Adatoms', color='C2', linestyle='-')
+    # ax[0].legend(fontsize=20)
+    # ax[0].set_xlabel(r'$E$ [eV]',fontsize=24)
+    # ax[0].set_ylabel('DOS [a.u.]',fontsize=24)
+    #
+    # ax[1].tick_params(labelsize=20)
+    # ax[1].plot(E, np.real(DOS_adatoms)-np.real(DOS_pristine), label='Difference', color='C2', linestyle='-')
+    # ax[1].legend(fontsize=20)
+    # ax[1].set_xlabel(r'$E$ [eV]',fontsize=24)
+    # ax[1].set_yticks([])
+    # plt.tight_layout(pad=0.1)
+    fig, ax = plt.subplots(figsize=(5,5))
+    ax.tick_params(labelsize=20)
+    ax.plot(E, np.real(DOS_pristine), label='Pristine', color='k', linestyle='--')
+    ax.plot(E, np.real(DOS_adatoms), label='Adatoms', color='C2', linestyle='-')
+    ax.legend(fontsize=20)
+    ax.set_xlabel(r'$E$ [eV]',fontsize=24)
+    ax.set_ylabel('DOS [a.u.]',fontsize=24)
+    ax.axes.yaxis.set_ticklabels([])
+    plt.tight_layout()
+    plt.show()
 
 
 ## PLOTTING HELPERS

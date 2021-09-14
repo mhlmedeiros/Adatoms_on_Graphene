@@ -242,24 +242,6 @@ def neighboring_sites(adatom_site, list_of_sites, radius):
 
 
 ## SPIN-ORBIT COUPLING DUE TO THE ADATOMS:
-def get_CH(system, CH_sublattices, H_sublattices):
-    """
-    system := kwant.builder.Builder
-    CH_sublattices := list of the graphene sublattices
-    H_sublattices := list of H atoms sublattices
-    """
-    A, B = CH_sublattices
-    HA, HB = H_sublattices
-
-    list_CH = []
-
-    for site in system.sites():
-        if site.family == ha:
-            list_CH.append(a(*site.tag))
-        elif site.family == hb:
-            list_CH.append(b(*site.tag))
-    return list_CH
-
 def get_neighbors(system, C_H_site, CH_sublattices):
     """
     Returns a list containing 2 other lists:

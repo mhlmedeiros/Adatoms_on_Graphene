@@ -15,26 +15,47 @@ class Rectangle:
     shape of the scattering region of a rectangular
     system.
     """
-    def __init__(self, W, L):
+    def __init__(self, width, length, delta=2, centered=True):
         '''
         Calling the scattering region as strip:
         W = width of the strip
         L = length of the strip
         '''
-        self.W = W
-        self.L = L
+        self.width  = width
+        self.length = length
+        self.delta  = delta
 
-    def __call__(self, pos):
-        W, L = self.W, self.L
-        x, y = pos
-        return -W/2 < y < W/2 and -L/2 <= x <= L/2
+        if centered:
+            self.x_inf = -length/2
+            self.x_sup = -self.x_inf
+            self.y_inf = -width/2
+            self.y_sup = -self.y_inf
+        else:
+            self.x_inf = 0
+            self.x_sup = length
+            self.y_inf = 0
+            self.y_sup = width
+
+    def is_allowed(self, site):
+        x, y = site.pos
+        delta = self.delta
+        x_inf, x_sup = self.x_inf + delta, self.x_sup - delta
+        y_inf, y_sup = self.y_inf + delta, self.y_sup - delta
+        return x_inf <= x < self.x_sup and self.y_inf < y < self.y_sup
 
     def leads(self, pos):
-        W = self.W
         _, y = pos
-        return -W/2 < y < W/2
+        y_inf, y_sup = self.y_inf, self.y_sup
+        return y_inf < y < y_sup
 
-## Limited region with magnetic field:
+    def __call__(self, pos):
+        x, y = pos
+        x_inf, x_sup = self.x_inf, self.x_sup
+        y_inf, y_sup = self.y_inf, self.y_sup
+        return y_inf < y < y_sup and x_inf <= x <= x_sup
+
+
+## Limitted region with magnetic field:
 class Bfield:
    def __init__(self, Bvalue, length=None):
        """
@@ -51,11 +72,11 @@ class Bfield:
        be made alongside the choice of the gauge.
        """
        self.Bvalue = Bvalue
-       self.L = length
+       self.length = length
 
    def __call__(self, x, y):
        if self.length:
-           return self.Bvalue if np.abs(x) <= self.L/2 else 0
+           return self.Bvalue if np.abs(x) <= self.length/2 else 0
        else:
            return self.Bvalue
 
@@ -190,7 +211,7 @@ def change_x(x, Lm):
 
 
 ## Getting the neighboring sites
-def get_neighbors(system, C_H_site, CH_sublattices):
+def get_neighbors(system, C_H_site):
     """
     Returns a list containing 2 other lists:
         - nn_list = list of nearest neighbors sites
@@ -198,11 +219,11 @@ def get_neighbors(system, C_H_site, CH_sublattices):
     """
     site_tag = C_H_site.tag
     site_sub = C_H_site.family
-    nn_list = get_nn(system, site_tag, site_sub, CH_sublattices)
+    nn_list = get_nn(system, site_tag, site_sub)
     nnn_list = get_nnn(system, site_tag, site_sub)
     return [nn_list, nnn_list]
 
-def get_nn(system, tag, sub_s, list_sub_lat):
+def get_nn(system, tag, sub_s):
     """
     system := kwant.builder.Builder
     tag    := tuple (i,j) of the site's tag
@@ -210,6 +231,7 @@ def get_nn(system, tag, sub_s, list_sub_lat):
 
     Notice that
     """
+    list_sub_lat = [A, B]
     list_sub_lat.remove(sub_s) # remove the sublattice to which the site belongs
     sub_nn, = list_sub_lat     # extract the sublattice of the neighbors
     # print(sub_nn.name[-1])
@@ -246,7 +268,27 @@ def get_nnn(system, tag, sub_s):
 #         print(site)
     return nnn_sites
 
-## # TODO: UPDATE THE REST OF THE CODE STARTING HERE (14/09/2021) 
+def get_adatom_AB_positions(total_number_of_adatoms, allowed_sites):
+    A_adatoms_to_place = total_number_of_adatoms // 2
+    B_adatoms_to_place = total_number_of_adatoms - A_adatoms_to_place
+    list_of_A_adatoms = []
+    list_of_B_adatoms = []
+
+    while A_adatoms_to_place or B_adatoms_to_place:
+        site_adatom = allowed_sites[np.random.choice(len(allowed_sites))]
+        if site_adatom.family == A and A_adatoms_to_place:
+            list_of_A_adatoms.append(site_adatom)
+            allowed_sites = exclude_neighboring_sites(site_adatom, allowed_sites)
+            A_adatoms_to_place -= 1
+        elif site_adatom.family == B and B_adatoms_to_place:
+            list_of_B_adatoms.append(site_adatom)
+            allowed_sites = exclude_neighboring_sites(site_adatom, allowed_sites)
+            B_adatoms_to_place -= 1
+        if not allowed_sites:
+            break
+    return list_of_A_adatoms, list_of_B_adatoms, allowed_sites
+
+# TODO: UPDATE THE REST OF THE CODE STARTING HERE (14/09/2021)
 #====================================================================#
 #                          System Builders                           #
 #====================================================================#
@@ -337,19 +379,13 @@ def include_BR_sitewise(system, CH_site, NN_site, t=1, Lambda_BR=1):
     Update the hopping between the CH_site and the NN_site to include
     the Bychkov-Rashba SOC.
     """
-    # 1. Identify the hopping 2/2:
+    # 1. Identify the hopping:
     dx, dy = np.sqrt(3) * (CH_site.pos - NN_site.pos)
-
-
-
+    # 2. Calculate the hopping:
     H_hop_matrix = t * sigma_0
     H_BR_matrix = (2j/3) * Lambda_BR * (dy * sigma_x - dx * sigma_y) ## (S X d_ij)_z
-
     H_matrix = H_hop_matrix + H_BR_matrix
-
     H_BR = HoppingFunction(B_0_hopping = H_matrix, sign=+1)
-
-
     # 2. Define the hopping
     system[CH_site, NN_site] = H_BR
 
@@ -412,6 +448,56 @@ def insert_adatom(syst, pos_tag, sub_lat, t=1, l_iso=1, T=1, L_I=1, L_BR=1, L_PI
         include_PIA_sitewise(syst, site1, site2, lambda_I=l_iso, Lambda_PIA=L_PIA)
 
 
+def insert_adatoms_soc(system, shape, adatom_concentration, adatom_params):
+
+    ## INSERTING ADATOMS:
+    print("Collecting the allowed sites to place adatoms...", end=' ')
+    allowed_sites = [site for site in system.sites() if shape.is_allowed(site)]
+    print("OK")
+
+    print("Inserting adatoms randomly...", end=' ')
+    n_Carbon_sites = len(system.sites())
+    n_Hydrogen_sites = int(n_Carbon_sites // (100/adatom_concentration))
+    number_of_adatoms_pbc = max(1, n_Hydrogen_sites)
+    list_of_A_sites, list_of_B_sites, allowed_sites = get_adatom_AB_positions(
+                                                            number_of_adatoms_pbc,
+                                                            allowed_sites)
+    A_adatoms_tags = [site.tag for site in list_of_A_sites]
+    B_adatoms_tags = [site.tag for site in list_of_B_sites]
+    CH_sites = list_of_A_sites + list_of_B_sites
+
+    all_neighbors = [get_neighbors(system, CH) for CH in CH_sites]
+    all_NN_neighbors = [a[0] for a in all_neighbors_pbc]
+    all_NNN_neighbors = [a[1] for a in all_neighbors_pbc]
+
+    T = params['T']          #  5.5 eV Fluorine,  7.5 eV Hydrogen: ADATOM-CARBON HOPPING
+    epsilon = params['eps']  # -2.2 eV Fluorine, 0.16 eV Hydrogen: ON-SITE ENERGY FOR ADATOM
+
+    for tagA in A_adatoms_tags_pbc:
+        system[HA(*tagA)] = sigma_0 * epsilon     # on-site
+        system[A(*tagA), HA(*tagA)] = sigma_0 * T # hopping with C_H
+
+    for tagB in B_adatoms_tags_pbc:
+        system[HB(*tagB)] = sigma_0 * epsilon     # on-site
+        system[B(*tagB), HB(*tagB)] = sigma_0 * T # hopping with C_H
+
+    print("OK")
+
+    print("Considering the SOC terms...", end=" ")
+    ## Calculate and include the Adatom induced spin-orbit coupling (ASO)
+    include_all_ASO(system, CH_sites, all_NNN_neighbors, Lambda_I=params['Lambda_I'])
+
+    ## Calculate and include into the system the Bychkov-Rashba spin-orbit coupling (BR)
+    include_all_BR(system, CH_sites, all_NN_neighbors, Lambda_BR=params['Lambda_BR'])
+
+    ## Calculate and include into the system the Pseudo-spin inversion asymmetry spin-orbit coupling (PIA)
+    include_all_PIA(system, all_NN_neighbors, Lambda_PIA=params['Lambda_PIA'], iso=False)
+    print("OK")
+    # print("Formating sites for plotting...", end=' ')
+    # format_sites_3 = FormatMapSites(allowed_sites, CH_sites)
+    # print("OK")
+    return system
+
 
 #====================================================================#
 #                          Plotting helpers                          #
@@ -460,7 +546,7 @@ def calculate_conductance(syst, energy_values, params_dict):
 #====================================================================#
 def main():
     ## Define the shape of the system:
-    shape = Rectangle(W=5, L=5)
+    shape = Rectangle(width=5, length=5)
 
     ## Build the scattering region:
     system = make_graphene_strip(graphene, shape, t=1, iso=1e-6)
@@ -488,15 +574,15 @@ def main():
     insert_adatom(system, pos_tag, sub_lat,  **adatom_params)
 
 
-    # # Figure
-    # fig, ax = plt.subplots(figsize=(20,5))
-    # kwant.plot(system,
-    #            site_color=family_colors,
-    #            hop_color=hopping_colors,
-    #            hop_lw=hopping_lw,
-    #            site_lw=0.1, ax=ax)
-    # ax.set_aspect('equal')
-    # plt.show()
+    # Figure
+    fig, ax = plt.subplots(figsize=(20,5))
+    kwant.plot(system,
+               site_color=family_colors,
+               hop_color=hopping_colors,
+               hop_lw=hopping_lw,
+               site_lw=0.1, ax=ax)
+    ax.set_aspect('equal')
+    plt.show()
 
     # Calculate the transmission
     parameters_hand = dict(V=0,
@@ -508,13 +594,13 @@ def main():
                            peierls_lead_R=peierls_lead_R,
                            Lm=3,
                         )
-    energy_values = np.linspace(-0.5,0.5,300)
-    transmission1 = calculate_conductance(system, energy_values, params_dict=parameters_hand)
-
+    # energy_values = np.linspace(-0.5,0.5,300)
+    # transmission1 = calculate_conductance(system, energy_values, params_dict=parameters_hand)
     #
-    plt.plot(energy_values, transmission1)
-    # plt.plot(energy_values, transmission2)
-    plt.show()
+    # #
+    # plt.plot(energy_values, transmission1)
+    # # plt.plot(energy_values, transmission2)
+    # plt.show()
 
 
 if __name__ == '__main__':

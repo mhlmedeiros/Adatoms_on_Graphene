@@ -114,7 +114,7 @@ def insert_adatoms_soc(system, n_cells_a1, n_cells_a2, adatom_concentration, par
     B_adatoms_tags_pbc = [site.tag for site in list_of_B_adatom_sites_pbc]
     CH_sites_pbc = list_of_A_adatom_sites_pbc + list_of_B_adatom_sites_pbc
 
-    all_neighbors_pbc = [get_neighbors(system, CH, [A,B]) for CH in CH_sites_pbc]
+    all_neighbors_pbc = [get_neighbors(system, CH) for CH in CH_sites_pbc]
     all_NN_neighbors_pbc = [a[0] for a in all_neighbors_pbc]
     all_NNN_neighbors_pbc = [a[1] for a in all_neighbors_pbc]
 
@@ -242,7 +242,7 @@ def neighboring_sites(adatom_site, list_of_sites, radius):
 
 
 ## SPIN-ORBIT COUPLING DUE TO THE ADATOMS:
-def get_neighbors(system, C_H_site, CH_sublattices):
+def get_neighbors(system, C_H_site):
     """
     Returns a list containing 2 other lists:
         - nn_list = list of nearest neighbors sites
@@ -250,11 +250,11 @@ def get_neighbors(system, C_H_site, CH_sublattices):
     """
     site_tag = C_H_site.tag
     site_sub = C_H_site.family
-    nn_list = get_nn(system, site_tag, site_sub, CH_sublattices)
+    nn_list = get_nn(system, site_tag, site_sub)
     nnn_list = get_nnn(system, site_tag, site_sub)
     return [nn_list, nnn_list]
 
-def get_nn(system, tag, sub_s, list_sub_lat):
+def get_nn(system, tag, sub_s):
     """
     system := kwant.builder.Builder
     tag    := tuple (i,j) of the site's tag
@@ -262,6 +262,7 @@ def get_nn(system, tag, sub_s, list_sub_lat):
 
     Notice that
     """
+    list_sub_lat = [A, B]
     list_sub_lat.remove(sub_s) # remove the sublattice to which the site belongs
     sub_nn, = list_sub_lat     # extract the sublattice of the neighbors
     # print(sub_nn.name[-1])
@@ -299,114 +300,70 @@ def get_nnn(system, tag, sub_s):
     return nnn_sites
 
 # FOR EACH ADATOM:
-def include_ASO_sitewise(system, CH_site, NNN_site, hop_list, Lambda_I):
+def include_ASO_sitewise(system, CH_site, NNN_site, Lambda_I):
     """
-    This function has two effects:
-        1. Define a hopping between CH_site and NNN_site
-        2. Returns an updated hop_list
-
-    Naturaly, the first effect occurs only in the case the hopping
-    isn't on the list. Otherwise the hopping will not be included and
-    the hop_list will not be altered.
+    Define and replace the hopping between CH_site and one of its NNN sites,
+    which is identified here as NNN_site.
     """
-    # 1. Verify if the hopping is duplicated
-    if (CH_site, NNN_site) not in hop_list:
+    # 1.1. Identify the hopping 1/2
+    delta_tag = list(NNN_site.tag - CH_site.tag)
+    if delta_tag in ([0,1], [1,-1], [-1,0]): sign = -1
+    else: sign = +1
 
-        # 2.1. Identify the hopping 1/2
-        delta_tag = list(NNN_site.tag - CH_site.tag)
-        if delta_tag in ([0,1], [1,-1], [-1,0]): sign = -1
-        else: sign = +1
+    # 1.2. Identify the hopping 2/2
+    family_id  = 1 - 2 * int(CH_site.family.name[-1]) ## 1 (-1) if sublattice == A (B)
 
-        # 2.2. Identify the hopping 2/2
-        family_id  = 1 - 2 * int(CH_site.family.name[-1]) ## 1 (-1) if sublattice == A (B)
+    # 3. Define the hopping
+    H_asoc = sign * family_id * 1j/3 * Lambda_I/np.sqrt(3) * sigma_z # clockwise
+    system[CH_site, NNN_site] = H_asoc ## sytem[sublat_1(target), sublat_2(source)]
 
-        # 3. Define the hopping
-        H_asoc = sign * family_id * 1j/3 * Lambda_I/np.sqrt(3) * sigma_z # clockwise
-        system[CH_site, NNN_site] = H_asoc ## sytem[sublat_1(target), sublat_2(source)]
-
-        # 4. Save pairs in hop_list
-        hop_list.append((CH_site, NNN_site)) # (CH, NNN)
-        hop_list.append((NNN_site, CH_site)) # (NNN, CH)
-
-    return hop_list
-
-def include_BR_sitewise(system, CH_site, NN_site, hop_list, Lambda_BR):
+def include_BR_sitewise(system, CH_site, NN_site, Lambda_BR):
     """
-    This function has two effects:
-        1. Define a hopping between CH_site and NN_site
-        2. Returns an updated hop_list
-
-    The first effect occurs only in the case the hopping
-    isn't on the list. Otherwise the hopping will not be included and
-    the hop_list will not be altered.
+    Update the hopping between the CH_site and the NN_site to include
+    the Bychkov-Rashba SOC.
     """
-    # 1. Verify if the hopping is duplicated
-    if (CH_site, NN_site) not in hop_list:
+    # 1. Identify the hopping:
+    dx, dy = np.sqrt(3) * (CH_site.pos - NN_site.pos)
+    H_BR = (2j/3) * Lambda_BR * (dy * sigma_x - dx * sigma_y) ## (S X d_ij)_z
 
-        # 2. Identify the hopping 2/2:
-        dx, dy = np.sqrt(3) * (CH_site.pos - NN_site.pos)
-        H_BR = (2j/3) * Lambda_BR * (dy * sigma_x - dx * sigma_y) ## (S X d_ij)_z
+    # 2. Define the hopping
+    system[CH_site, NN_site] += H_BR
 
-        # 3. Define the hopping
-        system[CH_site, NN_site] += H_BR
-
-        # 4. Save pairs in hop_list
-        hop_list.append((CH_site, NN_site)) # (CH, NNN)
-        hop_list.append((NN_site, CH_site)) # (NNN, CH)
-
-    return hop_list
-
-def include_PIA_sitewise(system, site_target, site_source, hop_list, Lambda_PIA, iso):
+def include_PIA_sitewise(system, site_target, site_source, Lambda_PIA, iso):
     """
-    This function has two effects:
-        1. Define a hopping between CH_site and NN_site
-        2. Returns an updated hop_list
-
-    The first effect occurs only in the case the hopping
-    isn't on the list. Otherwise the hopping will not be included and
-    the hop_list will not be altered.
+    Define the PIA hopping and add to the already existent hopping between
+    site_target and site_source.
     """
-    # 1. Verify if the hopping is duplicated
-    if (site_target, site_source) not in hop_list:
+    # 2. Identify the hopping:
+    Dx, Dy = site_target.pos - site_source.pos
 
-        # 2. Identify the hopping:
-        Dx, Dy = site_target.pos - site_source.pos
+    # 3. Define the hopping
+    H_PIA =  2j/3 * Lambda_PIA * (Dy * sigma_x - Dx * sigma_y) ## (S x D_ij)_z
+    if iso:
+        system[site_target, site_source] += H_PIA
+    else:
+        system[site_target, site_source] = H_PIA
 
-        # 3. Define the hopping
-        H_PIA =  2j/3 * Lambda_PIA * (Dy * sigma_x - Dx * sigma_y) ## (S x D_ij)_z
-        if iso:
-            system[site_target, site_source] += H_PIA
-        else:
-            system[site_target, site_source] = H_PIA
-
-        # 4. Save pairs in hop_list
-        hop_list.append((site_target, site_source)) # (site1, site2)
-        hop_list.append((site_source, site_target)) # (site2, site1)
-
-    return hop_list
 
 # FOR ALL ADATOMS:
 def include_all_ASO(system, all_CH_sites, all_NNN_neighbors, Lambda_I=1):
-    hop_list_ASO = []
     for CH_site, NNN_sites in zip(all_CH_sites, all_NNN_neighbors):
         for NNN_site in NNN_sites:
-            include_ASO_sitewise(system, CH_site, NNN_site, hop_list_ASO, Lambda_I)
+            include_ASO_sitewise(system, CH_site, NNN_site, Lambda_I)
 
 def include_all_BR(system, all_CH_sites, all_NN_neighbors, Lambda_BR=1):
-    hop_list_BR = []
     for CH_site, NN_sites in zip(all_CH_sites, all_NN_neighbors):
         # print(len(NN_sites))
         for NN_site in NN_sites:
             # print(NN_site)
-            include_BR_sitewise(system, CH_site, NN_site, hop_list_BR, Lambda_BR)
+            include_BR_sitewise(system, CH_site, NN_site, Lambda_BR)
 
 def include_all_PIA(system, all_NN_neighbors, Lambda_PIA=1, iso=True):
-    hop_list_PIA = []
     for NN_sites in all_NN_neighbors:
         targets = [NN_sites[(i+1)%3] for i in range(3)]
         for site1, site2 in zip(targets, NN_sites):
             # print(site1, '<--', site2)
-            include_PIA_sitewise(system, site1, site2, hop_list_PIA, Lambda_PIA, iso)
+            include_PIA_sitewise(system, site1, site2, Lambda_PIA, iso)
 
 
 ## CALCULATE DENSITY OF STATES:
@@ -510,8 +467,8 @@ def plor_system_format(system):
 
 
 def main():
-    n_cells_a1 = 300
-    n_cells_a2 = 300
+    n_cells_a1 = 30
+    n_cells_a2 = 30
     adatom_concentration = 0.125  # [% of Carbon atoms]
 
     ## BUILDING PRISTINE SYSTEM:
@@ -519,7 +476,7 @@ def main():
 
     ## CALCULATING THE DENSITY OF STATES:
     energies = np.linspace(-0.5, 0.5, 501)
-    # density_pristine = dos_kpm(system, energies, resolution=0.03)
+    density_pristine = dos_kpm(system, energies, resolution=0.03)
     # np.savez('../results/dos/density_of_states_pristine_pbc_300x300_resolution_0,03.npz', energies=energies, density=density_pristine)
 
     ## INSERTING ADATOMS:
@@ -529,9 +486,9 @@ def main():
     # system = insert_adatoms(system, adatom_concentration, n_cells_a1, n_cells_a2)
 
     density_adatoms = dos_kpm(system, energies, resolution=0.03)
-    np.savez('../results/dos/density_of_states_with_0,125_F_adatoms_pbc_300x300_resolution_0,03.npz', energies=energies, density=density_adatoms)
+    # np.savez('../results/dos/density_of_states_with_0,125_F_adatoms_pbc_300x300_resolution_0,03.npz', energies=energies, density=density_adatoms)
 
-    # plot_density_of_states(energies, density_pristine, density_adatoms)
+    plot_density_of_states(energies, density_pristine, density_adatoms)
 
 
 

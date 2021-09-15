@@ -39,9 +39,9 @@ class Rectangle:
     def is_allowed(self, site):
         x, y = site.pos
         delta = self.delta
-        x_inf, x_sup = self.x_inf + delta, self.x_sup - delta
-        y_inf, y_sup = self.y_inf + delta, self.y_sup - delta
-        return x_inf <= x < self.x_sup and self.y_inf < y < self.y_sup
+        x_min, x_max = self.x_inf + delta, self.x_sup - delta
+        y_min, y_max = self.y_inf + delta, self.y_sup - delta
+        return x_min <= x < x_max and y_min < y < y_max
 
     def leads(self, pos):
         _, y = pos
@@ -288,6 +288,23 @@ def get_adatom_AB_positions(total_number_of_adatoms, allowed_sites):
             break
     return list_of_A_adatoms, list_of_B_adatoms, allowed_sites
 
+def exclude_neighboring_sites(adatom_site, list_of_sites, radius=2):
+    sites_to_exclude = neighboring_sites(adatom_site, list_of_sites, radius)
+    for site in sites_to_exclude:
+        list_of_sites.remove(site)
+    return list_of_sites
+
+def neighboring_sites(adatom_site, list_of_sites, radius):
+    list_of_neighboring_sites = []
+    xA, yA = adatom_site.pos
+    for site in list_of_sites:
+        x, y = site.pos
+        if (x-xA)**2 + (y-yA)**2 <= radius**2:
+            list_of_neighboring_sites.append(site)
+    return list_of_neighboring_sites
+
+
+
 # TODO: UPDATE THE REST OF THE CODE STARTING HERE (14/09/2021)
 #====================================================================#
 #                          System Builders                           #
@@ -448,8 +465,11 @@ def insert_adatom(syst, pos_tag, sub_lat, t=1, l_iso=1, T=1, L_I=1, L_BR=1, L_PI
         include_PIA_sitewise(syst, site1, site2, lambda_I=l_iso, Lambda_PIA=L_PIA)
 
 
-def insert_adatoms_soc(system, shape, adatom_concentration, adatom_params):
-
+def insert_adatoms_randomly(system, shape, adatom_concentration, adatom_params):
+    """
+    It is the almost the same function defined in "Periodic_Boundary_Conditions.py",
+    located in this same directory.
+    """
     ## INSERTING ADATOMS:
     print("Collecting the allowed sites to place adatoms...", end=' ')
     allowed_sites = [site for site in system.sites() if shape.is_allowed(site)]
@@ -458,26 +478,26 @@ def insert_adatoms_soc(system, shape, adatom_concentration, adatom_params):
     print("Inserting adatoms randomly...", end=' ')
     n_Carbon_sites = len(system.sites())
     n_Hydrogen_sites = int(n_Carbon_sites // (100/adatom_concentration))
-    number_of_adatoms_pbc = max(1, n_Hydrogen_sites)
+    number_of_adatoms = max(1, n_Hydrogen_sites)
     list_of_A_sites, list_of_B_sites, allowed_sites = get_adatom_AB_positions(
-                                                            number_of_adatoms_pbc,
+                                                            number_of_adatoms,
                                                             allowed_sites)
     A_adatoms_tags = [site.tag for site in list_of_A_sites]
     B_adatoms_tags = [site.tag for site in list_of_B_sites]
     CH_sites = list_of_A_sites + list_of_B_sites
 
     all_neighbors = [get_neighbors(system, CH) for CH in CH_sites]
-    all_NN_neighbors = [a[0] for a in all_neighbors_pbc]
-    all_NNN_neighbors = [a[1] for a in all_neighbors_pbc]
+    all_NN_neighbors = [a[0] for a in all_neighbors]
+    all_NNN_neighbors = [a[1] for a in all_neighbors]
 
-    T = params['T']          #  5.5 eV Fluorine,  7.5 eV Hydrogen: ADATOM-CARBON HOPPING
-    epsilon = params['eps']  # -2.2 eV Fluorine, 0.16 eV Hydrogen: ON-SITE ENERGY FOR ADATOM
+    T = adatom_params['T']          #  5.5 eV Fluorine,  7.5 eV Hydrogen: ADATOM-CARBON HOPPING
+    epsilon = adatom_params['eps']  # -2.2 eV Fluorine, 0.16 eV Hydrogen: ON-SITE ENERGY FOR ADATOM
 
-    for tagA in A_adatoms_tags_pbc:
+    for tagA in A_adatoms_tags:
         system[HA(*tagA)] = sigma_0 * epsilon     # on-site
         system[A(*tagA), HA(*tagA)] = sigma_0 * T # hopping with C_H
 
-    for tagB in B_adatoms_tags_pbc:
+    for tagB in B_adatoms_tags:
         system[HB(*tagB)] = sigma_0 * epsilon     # on-site
         system[B(*tagB), HB(*tagB)] = sigma_0 * T # hopping with C_H
 
@@ -485,18 +505,36 @@ def insert_adatoms_soc(system, shape, adatom_concentration, adatom_params):
 
     print("Considering the SOC terms...", end=" ")
     ## Calculate and include the Adatom induced spin-orbit coupling (ASO)
-    include_all_ASO(system, CH_sites, all_NNN_neighbors, Lambda_I=params['Lambda_I'])
+    include_all_ASO(system, CH_sites, all_NNN_neighbors, Lambda_I=adatom_params['Lambda_I'])
 
     ## Calculate and include into the system the Bychkov-Rashba spin-orbit coupling (BR)
-    include_all_BR(system, CH_sites, all_NN_neighbors, Lambda_BR=params['Lambda_BR'])
+    include_all_BR(system, CH_sites, all_NN_neighbors, Lambda_BR=adatom_params['Lambda_BR'])
 
     ## Calculate and include into the system the Pseudo-spin inversion asymmetry spin-orbit coupling (PIA)
-    include_all_PIA(system, all_NN_neighbors, Lambda_PIA=params['Lambda_PIA'], iso=False)
+    include_all_PIA(system, all_NN_neighbors, Lambda_PIA=adatom_params['Lambda_PIA'])
     print("OK")
     # print("Formating sites for plotting...", end=' ')
     # format_sites_3 = FormatMapSites(allowed_sites, CH_sites)
     # print("OK")
     return system
+
+
+# FOR ALL ADATOMS:
+def include_all_ASO(system, all_CH_sites, all_NNN_neighbors, Lambda_I=1):
+    for CH_site, NNN_sites in zip(all_CH_sites, all_NNN_neighbors):
+        for NNN_site in NNN_sites:
+            include_ASO_sitewise(system, CH_site, NNN_site, Lambda_I)
+
+def include_all_BR(system, all_CH_sites, all_NN_neighbors, Lambda_BR=1):
+    for CH_site, NN_sites in zip(all_CH_sites, all_NN_neighbors):
+        for NN_site in NN_sites:
+            include_BR_sitewise(system, CH_site, NN_site, Lambda_BR)
+
+def include_all_PIA(system, all_NN_neighbors, Lambda_PIA=1):
+    for NN_sites in all_NN_neighbors:
+        targets = [NN_sites[(i+1)%3] for i in range(3)]
+        for site1, site2 in zip(targets, NN_sites):
+            include_PIA_sitewise(system, site1, site2, Lambda_PIA)
 
 
 #====================================================================#
@@ -549,10 +587,10 @@ def main():
     shape = Rectangle(width=5, length=5)
 
     ## Build the scattering region:
-    system = make_graphene_strip(graphene, shape, t=1, iso=1e-6)
+    system = make_graphene_strip(graphene, shape, t=2.6, iso=12.0e-6)
 
     ## Make the leads:
-    leads  = make_graphene_leads(graphene, shape.leads, t=1, on_site=0, iso=1e-6)
+    leads  = make_graphene_leads(graphene, shape.leads, t=2.6, on_site=0, iso=12.0e-6)
 
     ## Attach the leads:
     for lead in leads:
@@ -586,7 +624,7 @@ def main():
 
     # Calculate the transmission
     parameters_hand = dict(V=0,
-                           t=1,
+                           t=2.6,
                            B=0.5*np.pi,
                            eps_H=0.16,
                            peierls=peierls_scatter,

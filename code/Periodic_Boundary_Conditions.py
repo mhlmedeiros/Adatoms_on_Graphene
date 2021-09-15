@@ -21,10 +21,10 @@ import scipy.sparse.linalg as sla
 
 ## DEFINITIONS:
 graphene = kwant.lattice.honeycomb(name='G', norbs=2)
-a, b = graphene.sublattices
+A, B = graphene.sublattices
 
 hydrogen = kwant.lattice.honeycomb(name='H', norbs=2)
-ha, hb = hydrogen.sublattices
+HA, HB = hydrogen.sublattices
 
 zeros_2x2 = tinyarray.array([[0,0],[0,0]])
 sigma_0 = tinyarray.array([[1,0],[0,1]])
@@ -53,9 +53,9 @@ class FormatMapSites:
     def color(self, site):
         if site in self.allowed:
             color = 'C1'
-        elif site in self.adatoms and site.family == a:
+        elif site in self.adatoms and site.family == A:
             color = 'r'
-        elif site in self.adatoms and site.family == b:
+        elif site in self.adatoms and site.family == B:
             color = 'magenta'
 #         elif site.family == A:
 #             color = 'w'
@@ -76,22 +76,22 @@ def make_system(N1=10, N2=20, pot=0, t=2.6):
     syst = kwant.Builder()
     for a1 in range(N1):
         for a2 in range(N2):
-            syst[a(a1, a2)] = -pot * sigma_0
-            syst[b(a1, a2)] = -pot * sigma_0
+            syst[A(a1, a2)] = -pot * sigma_0
+            syst[B(a1, a2)] = -pot * sigma_0
 
     # specify the hoppings of the graphene lattice in the
     # format expected by builder.HoppingKind
-    hoppings = (((0, 0), a, b), ((0, 1), a, b), ((-1, 1), a, b))
+    hoppings = (((0, 0), A, B), ((0, 1), A, B), ((-1, 1), A, B))
     syst[[kwant.builder.HoppingKind(*hopping) for hopping in hoppings]] = -t * sigma_0
 
     ## Horizontal hoppings PBC
     for j in range(1, N2):
-        syst[a(N1-1, j), b(0,j-1)] = -t * sigma_0
+        syst[A(N1-1, j), B(0,j-1)] = -t * sigma_0
 
     ## Vertical hopping PBC
     for i in range(N1):
-        syst[b(i, N2-1), a(i, 0)] = -t * sigma_0
-        syst[b((i+1) % N1, N2-1), a(i, 0)] = -t * sigma_0
+        syst[B(i, N2-1), A(i, 0)] = -t * sigma_0
+        syst[B((i+1) % N1, N2-1), A(i, 0)] = -t * sigma_0
 
     return syst
 
@@ -114,7 +114,7 @@ def insert_adatoms_soc(system, n_cells_a1, n_cells_a2, adatom_concentration, par
     B_adatoms_tags_pbc = [site.tag for site in list_of_B_adatom_sites_pbc]
     CH_sites_pbc = list_of_A_adatom_sites_pbc + list_of_B_adatom_sites_pbc
 
-    all_neighbors_pbc = [get_neighbors(system, CH, [a,b]) for CH in CH_sites_pbc]
+    all_neighbors_pbc = [get_neighbors(system, CH, [A,B]) for CH in CH_sites_pbc]
     all_NN_neighbors_pbc = [a[0] for a in all_neighbors_pbc]
     all_NNN_neighbors_pbc = [a[1] for a in all_neighbors_pbc]
 
@@ -122,12 +122,12 @@ def insert_adatoms_soc(system, n_cells_a1, n_cells_a2, adatom_concentration, par
     epsilon = params['eps']  # -2.2 eV Fluorine, 0.16 eV Hydrogen: ON-SITE ENERGY FOR ADATOM
 
     for tagA in A_adatoms_tags_pbc:
-        system[ha(*tagA)] = sigma_0 * epsilon     # on-site
-        system[a(*tagA), ha(*tagA)] = sigma_0 * T # hopping with C_H
+        system[HA(*tagA)] = sigma_0 * epsilon     # on-site
+        system[A(*tagA), HA(*tagA)] = sigma_0 * T # hopping with C_H
 
     for tagB in B_adatoms_tags_pbc:
-        system[hb(*tagB)] = sigma_0 * epsilon     # on-site
-        system[b(*tagB), hb(*tagB)] = sigma_0 * T # hopping with C_H
+        system[HB(*tagB)] = sigma_0 * epsilon     # on-site
+        system[B(*tagB), HB(*tagB)] = sigma_0 * T # hopping with C_H
 
     print("OK")
 
@@ -171,8 +171,8 @@ def insert_adatoms(system, adatom_concentration, n_cells_a1, n_cells_a2, verbati
 
 def insert_single_adatom(system, pos_adatom, t=7.5, V=0.16):
     n1, n2 = pos_adatom
-    system[ha(n1,n2)] = V
-    system[ha(n1,n2), a(n1,n2)] = t
+    system[HA(n1,n2)] = V
+    system[HA(n1,n2), A(n1,n2)] = t
     return system
 
 
@@ -190,11 +190,11 @@ def get_adatom_positions_balanced(total_number_of_adatoms, allowed_sites):
 
         site_adatom = allowed_sites[np.random.choice(len(allowed_sites))]
 
-        if site_adatom.family == a and A_adatoms_to_place:
+        if site_adatom.family == A and A_adatoms_to_place:
             list_of_A_adatoms.append(site_adatom)
             allowed_sites = exclude_neighboring_sites(site_adatom, allowed_sites)
             A_adatoms_to_place -= 1
-        elif site_adatom.family == b and B_adatoms_to_place:
+        elif site_adatom.family == B and B_adatoms_to_place:
             list_of_B_adatoms.append(site_adatom)
             allowed_sites = exclude_neighboring_sites(site_adatom, allowed_sites)
             B_adatoms_to_place -= 1
@@ -466,20 +466,20 @@ def hopping_lw(site1, site2):
     return 0.07 if site1.family == site2.family else 0.05
 
 def family_colors_H(site):
-        if site.family == a:
+        if site.family == A:
             color = 'k'
-        elif site.family == b:
+        elif site.family == B:
             color = 'k'
-        elif site.family == ha:
+        elif site.family == HA:
             color = 'blue'
-        elif site.family == hb:
+        elif site.family == HB:
             color = 'blue'
         else:
             color = 'cyan'
         return color
 
 def site_size_function(site):
-    if site.family == ha or site.family == hb:
+    if site.family == HA or site.family == HB:
         size = 0.4
     else:
         size = 0.1

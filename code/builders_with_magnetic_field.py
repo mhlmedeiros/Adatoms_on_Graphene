@@ -83,13 +83,28 @@ class Bfield:
 
 ## Hopping function's builder:
 class HoppingFunction:
-
-    def __init__(self, B_0_hopping, sign):
-        self.B_0_hopping = B_0_hopping
+    def __init__(self, soc_hopping_matrix, simple_hopping_matrix=0, sign=+1):
+        self.soc_hopping_matrix = soc_hopping_matrix
+        self.simple_hopping_matrix = simple_hopping_matrix
         self.sign = sign
 
-    def __call__(self, site1, site2, B, Lm, peierls):
-        return self.sign * self.B_0_hopping * peierls(site1, site2, B, Lm)
+    def __call__(self, site1, site2, t, B, Lm, peierls):
+        H0 = t * self.simple_hopping_matrix
+        HSOC = self.soc_hopping_matrix
+        return self.sign * (H0 + HSOC) * peierls(site1, site2, B, Lm)
+
+class ISOHoppingFunction:
+    def __init__(self, isoc_hopping_matrix, pia_hopping_matrix=0, sign=+1):
+        self.isoc_hopping_matrix = isoc_hopping_matrix
+        self.pia_hopping_matrix = pia_hopping_matrix
+        self.sign = sign
+
+    def __call__(self, site1, site2, lambda_iso, B, Lm, peierls):
+        H_ISO = lambda_iso * self.isoc_hopping_matrix
+        H_PIA = self.pia_hopping_matrix
+        return self.sign *  (H_ISO + H_PIA) * peierls(site1, site2, B, Lm)
+
+
 
 
 #====================================================================#
@@ -161,7 +176,7 @@ def on_site_H_with_Zeeman(site, eps_H, B, Lm):
 
 
 ## Peierls substitution:
-def hopping_by_hand(Site1, Site2, t, B, Lm, peierls):
+def simple_hopping(Site1, Site2, t, B, Lm, peierls):
     return -t * sigma_0 * peierls(Site1, Site2, B, Lm)
 
 def peierls_scatter(Site1, Site2, B, Lm):
@@ -309,7 +324,7 @@ def neighboring_sites(adatom_site, list_of_sites, radius):
 #====================================================================#
 #                          System Builders                           #
 #====================================================================#
-def make_graphene_strip(lattice, scatter_shape, t=1, iso=1e-6):
+def make_graphene_strip(lattice, scatter_shape):
 
     syst = kwant.Builder()
     syst[lattice.shape(scatter_shape, (0, 0))] = on_site_with_Zeeman  # this is a func. of Bfield and pos.
@@ -319,29 +334,27 @@ def make_graphene_strip(lattice, scatter_shape, t=1, iso=1e-6):
     a, b = lattice.sublattices
     hoppings_list = (((0, 0), a, b), ((0, 1), a, b), ((-1, 1), a, b))
 
-#     hopping = t * sigma_0
-
-    syst[[kwant.builder.HoppingKind(*hop) for hop in hoppings_list]] = hopping_by_hand
+    syst[[kwant.builder.HoppingKind(*hop) for hop in hoppings_list]] = simple_hopping
     syst.eradicate_dangling()
 
-    include_ISOC(syst, [a,b], lambda_I=iso)
+    include_ISOC(syst, [a,b])
 
     return syst
 
-def make_graphene_leads(lattice, lead_shape, t=1, on_site=0, iso=1e-6):
+def make_graphene_leads(lattice, lead_shape):
     a, b = lattice.sublattices
     symmetry = kwant.TranslationalSymmetry((-1,0))
     symmetry.add_site_family(a, other_vectors=[(-1,2)])
     symmetry.add_site_family(b, other_vectors=[(-1,2)])
 
     lead_0 = kwant.Builder(symmetry)
-    lead_0[lattice.shape(lead_shape, (0,0))] = zeros_2x2
+    # On-site energy is the same of the scattering region (by now)
+    lead_0[lattice.shape(lead_shape, (0,0))] = on_site_with_Zeeman
 
     hoppings_list = (((0, 0), a, b), ((0, 1), a, b), ((-1, 1), a, b))
-#     hopping = t * sigma_0
-    lead_0[(kwant.builder.HoppingKind(*hop) for hop in hoppings_list)] = hopping_by_hand
+    lead_0[(kwant.builder.HoppingKind(*hop) for hop in hoppings_list)] = simple_hopping
     lead_0.eradicate_dangling()
-    include_ISOC(lead_0, [a,b], lambda_I=iso)
+    include_ISOC(lead_0, [a,b])
 
     lead_1 = lead_0.reversed()
 
@@ -350,20 +363,19 @@ def make_graphene_leads(lattice, lead_shape, t=1, on_site=0, iso=1e-6):
 
     return [lead_0, lead_1]
 
-def include_ISOC(system, G_sub_lattices, lambda_I=1):
+def include_ISOC(system, G_sub_lattices):
     """
     ## INCLUDING THE INTRINSIC SOC (isoc):
     system         := kwant.builder.Builder
     G_sub_lattices := list of Graphene sublattices
-    lambda_I       := parameter
     """
     sub_a, sub_b = G_sub_lattices
-    # lambda_I   = 1 ## non-realistic; see reference: PRL 110, 246602 (2013)
 
-    H_isoc_matrix = -1j/3 * lambda_I/np.sqrt(3) * sigma_z # counter-clockwise
 
-    H_isoc_p = HoppingFunction(B_0_hopping=H_isoc_matrix, sign=+1)
-    H_isoc_m = HoppingFunction(B_0_hopping=H_isoc_matrix, sign=-1)
+    H_isoc_matrix = -1j/3 * 1/np.sqrt(3) * sigma_z # counter-clockwise
+
+    H_isoc_p = ISOHoppingFunction(isoc_hopping_matrix=H_isoc_matrix, sign=+1)
+    H_isoc_m = ISOHoppingFunction(isoc_hopping_matrix=H_isoc_matrix, sign=-1)
 
     system[kwant.builder.HoppingKind((1,0), sub_a, sub_a)]  = H_isoc_p
     system[kwant.builder.HoppingKind((0,1), sub_a, sub_a)]  = H_isoc_m
@@ -372,70 +384,8 @@ def include_ISOC(system, G_sub_lattices, lambda_I=1):
     system[kwant.builder.HoppingKind((0,1), sub_b, sub_b)]  = H_isoc_p
     system[kwant.builder.HoppingKind((-1,1), sub_b, sub_b)] = H_isoc_m
 
-def include_ASO_sitewise(system, CH_site, NNN_site, Lambda_I=1):
-    """
-    Define and replace the hopping between CH_site and one of its NNN sites,
-    which is identified here as NNN_site.
-    """
-    # 1.1. Identify the hopping 1/2
-    delta_tag = list(NNN_site.tag - CH_site.tag)
-    if delta_tag in ([0,1], [1,-1], [-1,0]): sign = -1
-    else: sign = +1
-
-    # 1.2. Identify the hopping 2/2
-    family_id  = 1 - 2 * int(CH_site.family.name[-1]) ## 1 (-1) if sublattice == A (B)
-
-    # 3. Define the hopping
-    H_asoc_matrix = family_id * 1j/3 * Lambda_I/np.sqrt(3) * sigma_z # clockwise
-    H_asoc = HoppingFunction(B_0_hopping=H_asoc_matrix, sign=sign)
-
-    system[CH_site, NNN_site] = H_asoc
-
-def include_BR_sitewise(system, CH_site, NN_site, t=1, Lambda_BR=1):
-    """
-    Update the hopping between the CH_site and the NN_site to include
-    the Bychkov-Rashba SOC.
-    """
-    # 1. Identify the hopping:
-    dx, dy = np.sqrt(3) * (CH_site.pos - NN_site.pos)
-    # 2. Calculate the hopping:
-    H_hop_matrix = t * sigma_0
-    H_BR_matrix = (2j/3) * Lambda_BR * (dy * sigma_x - dx * sigma_y) ## (S X d_ij)_z
-    H_matrix = H_hop_matrix + H_BR_matrix
-    H_BR = HoppingFunction(B_0_hopping = H_matrix, sign=+1)
-    # 2. Define the hopping
-    system[CH_site, NN_site] = H_BR
-
-def include_PIA_sitewise(system, site_target, site_source, lambda_I=1, Lambda_PIA=1):
-    """
-    Define the PIA hopping and add to the already existent hopping between
-    site_target and site_source.
-    """
-    # 1.1 Identify the hopping 1/2:
-    Dx, Dy = site_target.pos - site_source.pos
-
-    # 1.2 Identify the hopping 2/2:
-    delta_tag = site_target.tag - site_source.tag
-
-    # 2. ISO
-    sites_family = site_target.family
-    if sites_family == A and delta_tag in ([0,1], [1,-1], [-1,0]):
-        H_iso_matrix = 1j/3 * lambda_I/np.sqrt(3) * sigma_z
-    elif sites_family == B and delta_tag in ([0,-1], [-1,+1], [1,0]):
-        H_iso_matrix = 1j/3 * lambda_I/np.sqrt(3) * sigma_z
-    else:
-        H_iso_matrix = -1j/3 * lambda_I/np.sqrt(3) * sigma_z
-
-    # 3. PIA:
-    H_PIA_matrix =  2j/3 * Lambda_PIA * (Dy * sigma_x - Dx * sigma_y) ## (S x D_ij)_z
-
-    # 4. Total hopping:
-    H_PIA_ISO = HoppingFunction(B_0_hopping = (H_iso_matrix + H_PIA_matrix), sign=+1)
-
-    system[site_target, site_source] = H_PIA_ISO
-
-## Inserting adatom:
-def insert_adatom(syst, pos_tag, sub_lat, t=1, l_iso=1, T=1, L_I=1, L_BR=1, L_PIA=1):
+## INSERTING ADATOMS:
+def insert_adatom(syst, pos_tag, sub_lat, l_iso=1, T=1, L_I=1, L_BR=1, L_PIA=1):
 
     if sub_lat == A:
         site_CH = A(*pos_tag)
@@ -457,13 +407,12 @@ def insert_adatom(syst, pos_tag, sub_lat, t=1, l_iso=1, T=1, L_I=1, L_BR=1, L_PI
 
     ## Calculate and include into the system the Bychkov-Rashba spin-orbit coupling (BR)
     for site in nn_sites:
-        include_BR_sitewise(syst, site_CH, site,t=t, Lambda_BR=L_BR)
+        include_BR_sitewise(syst, site_CH, site, Lambda_BR=L_BR)
 
     ## Calculate and include into the system the Pseudo-spin inversion asymmetry spin-orbit coupling (PIA)
     targets = [nn_sites[(i+1)%3] for i in range(3)]
     for site1, site2 in zip(targets, nn_sites):
-        include_PIA_sitewise(syst, site1, site2, lambda_I=l_iso, Lambda_PIA=L_PIA)
-
+        include_PIA_sitewise(syst, site1, site2, Lambda_PIA=L_PIA)
 
 def insert_adatoms_randomly(system, shape, adatom_concentration, adatom_params):
     """
@@ -518,7 +467,6 @@ def insert_adatoms_randomly(system, shape, adatom_concentration, adatom_params):
     # print("OK")
     return system
 
-
 # FOR ALL ADATOMS:
 def include_all_ASO(system, all_CH_sites, all_NNN_neighbors, Lambda_I=1):
     for CH_site, NNN_sites in zip(all_CH_sites, all_NNN_neighbors):
@@ -536,6 +484,66 @@ def include_all_PIA(system, all_NN_neighbors, Lambda_PIA=1):
         for site1, site2 in zip(targets, NN_sites):
             include_PIA_sitewise(system, site1, site2, Lambda_PIA)
 
+# FOR EVERY ADATOM
+def include_ASO_sitewise(system, CH_site, NNN_site, Lambda_I=1):
+    """
+    Define and replace the hopping between CH_site and one of its NNN sites,
+    which is identified here as NNN_site.
+    """
+    # 1.1. Identify the hopping 1/2
+    delta_tag = list(NNN_site.tag - CH_site.tag)
+    if delta_tag in ([0,1], [1,-1], [-1,0]): sign = -1
+    else: sign = +1
+
+    # 1.2. Identify the hopping 2/2
+    family_id  = 1 - 2 * int(CH_site.family.name[-1]) ## 1 (-1) if sublattice == A (B)
+
+    # 3. Define the hopping
+    H_asoc_matrix = family_id * 1j/3 * Lambda_I/np.sqrt(3) * sigma_z # clockwise
+    H_asoc = HoppingFunction(soc_hopping_matrix=H_asoc_matrix, sign=sign)
+
+    system[CH_site, NNN_site] = H_asoc
+
+def include_BR_sitewise(system, CH_site, NN_site, Lambda_BR=1):
+    """
+    Update the hopping between the CH_site and the NN_site to include
+    the Bychkov-Rashba SOC.
+    """
+    # 1. Identify the hopping:
+    dx, dy = np.sqrt(3) * (CH_site.pos - NN_site.pos)
+    # 2. Calculate the hopping:
+    H_BR_matrix = (2j/3) * Lambda_BR * (dy * sigma_x - dx * sigma_y) ## (S X d_ij)_z
+    H_BR = HoppingFunction(soc_hopping_matrix = H_BR_matrix, simple_hopping_matrix = sigma_0, sign=+1)
+    # 3. (Re)Define the hopping including BR-SOC
+    system[CH_site, NN_site] = H_BR
+
+def include_PIA_sitewise(system, site_target, site_source, Lambda_PIA=1):
+    """
+    Define the PIA hopping and add to the already existent hopping between
+    site_target and site_source.
+    """
+    # 1.1 Identify the hopping 1/2:
+    Dx, Dy = site_target.pos - site_source.pos
+
+    # 1.2 Identify the hopping 2/2:
+    delta_tag = site_target.tag - site_source.tag
+
+    # 2. ISO
+    sites_family = site_target.family
+    if sites_family == A and delta_tag in ([0,1], [1,-1], [-1,0]):
+        H_iso_matrix = 1j/3 * 1/np.sqrt(3) * sigma_z
+    elif sites_family == B and delta_tag in ([0,-1], [-1,+1], [1,0]):
+        H_iso_matrix = 1j/3 * 1/np.sqrt(3) * sigma_z
+    else:
+        H_iso_matrix = -1j/3 * 1/np.sqrt(3) * sigma_z
+
+    # 3. PIA:
+    H_PIA_matrix =  2j/3 * Lambda_PIA * (Dy * sigma_x - Dx * sigma_y) ## (S x D_ij)_z
+
+    # 4. Total hopping:
+    H_PIA_ISO = ISOHoppingFunction(isoc_hopping_matrix = H_iso_matrix, pia_hopping_matrix = H_PIA_matrix, sign=+1)
+
+    system[site_target, site_source] = H_PIA_ISO
 
 #====================================================================#
 #                          Plotting helpers                          #
@@ -587,10 +595,10 @@ def main():
     shape = Rectangle(width=5, length=5)
 
     ## Build the scattering region:
-    system = make_graphene_strip(graphene, shape, t=2.6, iso=12.0e-6)
+    system = make_graphene_strip(graphene, shape, iso=12.0e-6)
 
     ## Make the leads:
-    leads  = make_graphene_leads(graphene, shape.leads, t=2.6, on_site=0, iso=12.0e-6)
+    leads  = make_graphene_leads(graphene, shape.leads, iso=12.0e-6)
 
     ## Attach the leads:
     for lead in leads:
@@ -598,8 +606,7 @@ def main():
 
     pos_tag = (0,0)  # Adatom's tag
     sub_lat = A      # Adatom's Sublattice
-    adatom_params = dict(t    = 2.6,
-                         l_iso=12e-6,
+    adatom_params = dict(l_iso=12e-6,
                          T    = 7.5,
                          L_I  = -0.21e-3,
                          L_BR = 0.33e-3,
@@ -632,13 +639,13 @@ def main():
                            peierls_lead_R=peierls_lead_R,
                            Lm=3,
                         )
-    # energy_values = np.linspace(-0.5,0.5,300)
-    # transmission1 = calculate_conductance(system, energy_values, params_dict=parameters_hand)
+    energy_values = np.linspace(-0.5,0.5,300)
+    transmission1 = calculate_conductance(system, energy_values, params_dict=parameters_hand)
+
     #
-    # #
-    # plt.plot(energy_values, transmission1)
-    # # plt.plot(energy_values, transmission2)
-    # plt.show()
+    plt.plot(energy_values, transmission1)
+    # plt.plot(energy_values, transmission2)
+    plt.show()
 
 
 if __name__ == '__main__':

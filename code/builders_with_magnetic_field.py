@@ -360,7 +360,7 @@ def make_graphene_leads(lattice, lead_shape):
     symmetry.add_site_family(a, other_vectors=[(-1,2)])
     symmetry.add_site_family(b, other_vectors=[(-1,2)])
 
-    lead_0 = kwant.Builder(symmetry)
+    lead_0 = kwant.Builder(symmetry, conservation_law=-sigma_z)
     # On-site energy is the same of the scattering region (by now)
     on_site_carbon = OnSiteZeeman()
     lead_0[lattice.shape(lead_shape, (0,0))] = on_site_carbon

@@ -84,25 +84,26 @@ def main():
         system.attach_lead(lead)
 
     ## INSERTING ADATOMS:
-    # adatom_H_params = dict(T = 7.5, eps = 0.16, Lambda_I = -0.21e-3, Lambda_BR = 0.33e-3, Lambda_PIA = -0.77e-3)
+    adatom_H_params = dict(T = 7.5, eps = 0.16, Lambda_I = -0.21e-3, Lambda_BR = 0.33e-3, Lambda_PIA = -0.77e-3)
     # adatom_F_params = dict(T = 5.5, eps = -2.2, Lambda_I = 3.3e-3, Lambda_BR = 11.2e-3, Lambda_PIA = -7.3e-3)
-    # system = bm.insert_adatoms_randomly(system, shape, adatom_concentration, adatom_params=adatom_H_params)
+    system = bm.insert_adatoms_randomly(system, shape, adatom_concentration, adatom_params=adatom_H_params)
+
+    plot_system(system)
 
     ## see reference: PRL 110, 246602 (2013) for realistic values of lambda_iso
 
     # Calculate the transmission
-    Bflux = 0     # in units of quantum of magnetic flux
+    Bflux = 0.05     # in units of quantum of magnetic flux
     Bfield = Bflux / (np.sqrt(3)/2)
     parameters_hand = dict(V=0,   # on-site C-atoms
                            t=2.6, # hoppings C-atoms
                            lambda_iso = 12e-6, # intrinsic soc (nnn-hoppings)
                            B=Bfield,
-                           eps_H=0.16, # on-site H-adatom
                            peierls=bm.peierls_scatter,
                            peierls_lead_L=bm.peierls_lead_L,
                            peierls_lead_R=bm.peierls_lead_R,
-                           Lm=0,
-                        )
+                           Lm=0)
+
     energy_values = np.linspace(-5,5,102)
     transmission = bm.calculate_conductance(system, energy_values, params_dict=parameters_hand)
 

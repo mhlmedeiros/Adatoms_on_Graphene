@@ -104,7 +104,19 @@ class ISOHoppingFunction:
         H_PIA = self.pia_hopping_matrix
         return self.sign *  (H_ISO + H_PIA) * peierls(site1, site2, B, Lm)
 
+class OnSiteZeeman:
+    def __init__(self, adatom_onsite=None):
+        self.adatom_onsite = adatom_onsite
 
+    def __call__(self, site, B, Lm, V):
+        x, y = site.pos
+        Bfunc = Bfield(Bvalue=B, length=Lm)
+        H_Z = g_Lande * Magneton_Bohr/2 * Bfunc(x,y) * sigma_z
+        if self.adatom_onsite:
+            onsite = self.adatom_onsite * sigma_0 + H_Z
+        else:
+            onsite = V * sigma_0 + H_Z
+        return onsite
 
 
 #====================================================================#
@@ -148,31 +160,31 @@ Magneton_Bohr = 5.788e-5 # eV/T
 #                    Builder's helper functions                      #
 #====================================================================#
 ## Zeeman:
-def on_site_with_Zeeman(site, V, B, Lm):
-    """
-    This function defines the on-site energy by
-    allowing to pass functions of position for
-    the electrical potential and the magnetic field
-    separately in order to account for the Zeeman
-    effect.
-    """
-    x, y = site.pos
-    Bfunc = Bfield(Bvalue=B, length=Lm)
-    H_Z = g_Lande * Magneton_Bohr/2 * Bfunc(x,y) * sigma_z
-    return V * sigma_0 + H_Z
-
-def on_site_H_with_Zeeman(site, eps_H, B, Lm):
-    """
-    This function is essentially a copy of 'on_site_with_Zeeman' with the
-    difference that here, the on-site energy is given by
-        * eps_H = on-site energy for the adatoms
-    instead of
-        * V = on-site for the carbon atoms
-    """
-    x, y = site.pos
-    Bfunc = Bfield(Bvalue=B, length=Lm)
-    H_Z = g_Lande * Magneton_Bohr/2 * Bfunc(x,y) * sigma_z
-    return eps_H * sigma_0 + H_Z
+# def on_site_with_Zeeman(site, V, B, Lm):
+#     """
+#     This function defines the on-site energy by
+#     allowing to pass functions of position for
+#     the electrical potential and the magnetic field
+#     separately in order to account for the Zeeman
+#     effect.
+#     """
+#     x, y = site.pos
+#     Bfunc = Bfield(Bvalue=B, length=Lm)
+#     H_Z = g_Lande * Magneton_Bohr/2 * Bfunc(x,y) * sigma_z
+#     return V * sigma_0 + H_Z
+#
+# def on_site_H_with_Zeeman(site, eps_H, B, Lm):
+#     """
+#     This function is essentially a copy of 'on_site_with_Zeeman' with the
+#     difference that here, the on-site energy is given by
+#         * eps_H = on-site energy for the adatoms
+#     instead of
+#         * V = on-site for the carbon atoms
+#     """
+#     x, y = site.pos
+#     Bfunc = Bfield(Bvalue=B, length=Lm)
+#     H_Z = g_Lande * Magneton_Bohr/2 * Bfunc(x,y) * sigma_z
+#     return eps_H * sigma_0 + H_Z
 
 
 ## Peierls substitution:
@@ -327,7 +339,8 @@ def neighboring_sites(adatom_site, list_of_sites, radius):
 def make_graphene_strip(lattice, scatter_shape):
 
     syst = kwant.Builder()
-    syst[lattice.shape(scatter_shape, (0, 0))] = on_site_with_Zeeman  # this is a func. of Bfield and pos.
+    on_site_carbon = OnSiteZeeman()
+    syst[lattice.shape(scatter_shape, (0, 0))] = on_site_carbon  # this is a func. of Bfield and pos.
 
     # Specify the hoppings for graphene lattice in the
     # format expected by builder.HoppingKind
@@ -349,7 +362,8 @@ def make_graphene_leads(lattice, lead_shape):
 
     lead_0 = kwant.Builder(symmetry)
     # On-site energy is the same of the scattering region (by now)
-    lead_0[lattice.shape(lead_shape, (0,0))] = on_site_with_Zeeman
+    on_site_carbon = OnSiteZeeman()
+    lead_0[lattice.shape(lead_shape, (0,0))] = on_site_carbon
 
     hoppings_list = (((0, 0), a, b), ((0, 1), a, b), ((-1, 1), a, b))
     lead_0[(kwant.builder.HoppingKind(*hop) for hop in hoppings_list)] = simple_hopping
@@ -385,7 +399,7 @@ def include_ISOC(system, G_sub_lattices):
     system[kwant.builder.HoppingKind((-1,1), sub_b, sub_b)] = H_isoc_m
 
 ## INSERTING ADATOMS:
-def insert_adatom(syst, pos_tag, sub_lat, l_iso=1, T=1, L_I=1, L_BR=1, L_PIA=1):
+def insert_adatom(syst, pos_tag, sub_lat, eps_H=1, T=1, L_I=1, L_BR=1, L_PIA=1):
 
     if sub_lat == A:
         site_CH = A(*pos_tag)
@@ -395,7 +409,8 @@ def insert_adatom(syst, pos_tag, sub_lat, l_iso=1, T=1, L_I=1, L_BR=1, L_PIA=1):
         site_H = HB(*pos_tag)
 
     ## On-site:
-    syst[site_H] = on_site_H_with_Zeeman
+    on_site_adatom = OnSiteZeeman(adatom_onsite=eps_H)
+    syst[site_H] = on_site_adatom
     ## Hopping:
     syst[site_H, site_CH] = T * sigma_0
     ## Neighbors
@@ -441,13 +456,14 @@ def insert_adatoms_randomly(system, shape, adatom_concentration, adatom_params):
 
     T = adatom_params['T']          #  5.5 eV Fluorine,  7.5 eV Hydrogen: ADATOM-CARBON HOPPING
     epsilon = adatom_params['eps']  # -2.2 eV Fluorine, 0.16 eV Hydrogen: ON-SITE ENERGY FOR ADATOM
+    on_site_adatom = OnSiteZeeman(adatom_onsite=epsilon)
 
     for tagA in A_adatoms_tags:
-        system[HA(*tagA)] = sigma_0 * epsilon     # on-site
+        system[HA(*tagA)] = on_site_adatom     # on-site
         system[A(*tagA), HA(*tagA)] = sigma_0 * T # hopping with C_H
 
     for tagB in B_adatoms_tags:
-        system[HB(*tagB)] = sigma_0 * epsilon     # on-site
+        system[HB(*tagB)] = on_site_adatom     # on-site
         system[B(*tagB), HB(*tagB)] = sigma_0 * T # hopping with C_H
 
     print("OK")
@@ -595,10 +611,10 @@ def main():
     shape = Rectangle(width=5, length=5)
 
     ## Build the scattering region:
-    system = make_graphene_strip(graphene, shape, iso=12.0e-6)
+    system = make_graphene_strip(graphene, shape)
 
     ## Make the leads:
-    leads  = make_graphene_leads(graphene, shape.leads, iso=12.0e-6)
+    leads  = make_graphene_leads(graphene, shape.leads)
 
     ## Attach the leads:
     for lead in leads:
@@ -606,16 +622,11 @@ def main():
 
     pos_tag = (0,0)  # Adatom's tag
     sub_lat = A      # Adatom's Sublattice
-    adatom_params = dict(l_iso=12e-6,
-                         T    = 7.5,
-                         L_I  = -0.21e-3,
-                         L_BR = 0.33e-3,
-                         L_PIA= -0.77e-3)
-
-
-    # In[23]:
-
-
+    adatom_params = dict(T     = 7.5,
+                         eps_H = 0.16,
+                         L_I   = -0.21e-3,
+                         L_BR  = 0.33e-3,
+                         L_PIA = -0.77e-3)
     insert_adatom(system, pos_tag, sub_lat,  **adatom_params)
 
 
@@ -630,19 +641,21 @@ def main():
     plt.show()
 
     # Calculate the transmission
-    parameters_hand = dict(V=0,
-                           t=2.6,
-                           B=0.5*np.pi,
-                           eps_H=0.16,
-                           peierls=peierls_scatter,
-                           peierls_lead_L=peierls_lead_L,
-                           peierls_lead_R=peierls_lead_R,
-                           Lm=3,
-                        )
-    energy_values = np.linspace(-0.5,0.5,300)
-    transmission1 = calculate_conductance(system, energy_values, params_dict=parameters_hand)
+    Bflux = 0.     # in units of quantum of magnetic flux
+    Bfield = Bflux / (np.sqrt(3)/2) # sqrt(3)/2 == hexagon area
+    parameters_hand = dict(V = 0,
+                           t = 2.6,
+                           lambda_iso = 12e-6,
+                           B = Bfield,
+                           Lm = 3,
+                           peierls = peierls_scatter,
+                           peierls_lead_L = peierls_lead_L,
+                           peierls_lead_R = peierls_lead_R)
+    energy_values = np.linspace(-5, 5, 300)
+    transmission1 = calculate_conductance(system, energy_values,
+                                         params_dict=parameters_hand)
 
-    #
+    # PLOT THE CONDUCTION
     plt.plot(energy_values, transmission1)
     # plt.plot(energy_values, transmission2)
     plt.show()

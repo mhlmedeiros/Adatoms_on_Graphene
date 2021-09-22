@@ -15,26 +15,29 @@ class Rectangle:
     shape of the scattering region of a rectangular
     system.
     """
-    def __init__(self, width, length, delta=2, centered=True):
+    def __init__(self, width, length, delta=2, centered=True, pbc=False):
         '''
         Calling the scattering region as strip:
         W = width of the strip
         L = length of the strip
         '''
-        self.width  = width
+        self.pbc = pbc
+        if pbc: self.width, self.N = w_to_close_pbc(width)
+        else: self.width, self.N = width, None
         self.length = length
         self.delta  = delta
 
-        if centered:
+        if centered and not pbc:
             self.x_inf = -length/2
             self.x_sup = -self.x_inf
             self.y_inf = -width/2
             self.y_sup = -self.y_inf
         else:
             self.x_inf = 0
-            self.x_sup = length
+            self.x_sup = self.length
             self.y_inf = 0
-            self.y_sup = width
+            self.y_sup = self.width
+
 
     def is_allowed(self, site):
         x, y = site.pos
@@ -46,13 +49,13 @@ class Rectangle:
     def leads(self, pos):
         _, y = pos
         y_inf, y_sup = self.y_inf, self.y_sup
-        return y_inf < y < y_sup
+        return y_inf < y <= y_sup
 
     def __call__(self, pos):
         x, y = pos
         x_inf, x_sup = self.x_inf, self.x_sup
         y_inf, y_sup = self.y_inf, self.y_sup
-        return y_inf < y < y_sup and x_inf <= x <= x_sup
+        return y_inf < y <= y_sup and x_inf <= x <= x_sup
 
 
 ## Limitted region with magnetic field:
@@ -118,6 +121,10 @@ class OnSiteZeeman:
             onsite = V * sigma_0 + H_Z
         return onsite
 
+def w_to_close_pbc(W):
+    N = int(max(W // np.sqrt(3), 2))
+    w_new = N * np.sqrt(3)
+    return w_new, N
 
 #====================================================================#
 #                    Lattice definitions                           #
@@ -336,42 +343,54 @@ def neighboring_sites(adatom_site, list_of_sites, radius):
 #====================================================================#
 #                          System Builders                           #
 #====================================================================#
-def make_graphene_strip(lattice, scatter_shape):
+def make_graphene_strip(lattice, shape):
 
     syst = kwant.Builder()
     on_site_carbon = OnSiteZeeman()
-    syst[lattice.shape(scatter_shape, (0, 0))] = on_site_carbon  # this is a func. of Bfield and pos.
+    syst[lattice.shape(shape, (0, 0))] = on_site_carbon  # this is a func. of Bfield and pos.
 
     # Specify the hoppings for graphene lattice in the
     # format expected by builder.HoppingKind
-    a, b = lattice.sublattices
-    hoppings_list = (((0, 0), a, b), ((0, 1), a, b), ((-1, 1), a, b))
+    A, B = lattice.sublattices
+    hoppings_list = (((0, 0), A, B), ((0, 1), A, B), ((-1, 1), A, B))
 
     syst[[kwant.builder.HoppingKind(*hop) for hop in hoppings_list]] = simple_hopping
-    syst.eradicate_dangling()
 
-    include_ISOC(syst, [a,b])
+    if shape.pbc:
+        sites_x_tags = [s.tag[0] for s in syst.sites()
+                       if (s.family == B and s.tag[1]==0)]
+        N = shape.N
+        M = max(sites_x_tags) + 1
+        for i in range(M):
+            syst[A(i-N, 2*N), B(i, 0)] = simple_hopping
+    else:
+        syst.eradicate_dangling()
+        include_ISOC(syst, [A,B])
 
     return syst
 
-def make_graphene_leads(lattice, lead_shape):
-    a, b = lattice.sublattices
+def make_graphene_leads(lattice, shape):
+    A, B = lattice.sublattices
     symmetry = kwant.TranslationalSymmetry((-1,0))
-    symmetry.add_site_family(a, other_vectors=[(-1,2)])
-    symmetry.add_site_family(b, other_vectors=[(-1,2)])
+    symmetry.add_site_family(A, other_vectors=[(-1,2)])
+    symmetry.add_site_family(B, other_vectors=[(-1,2)])
 
     lead_0 = kwant.Builder(symmetry, conservation_law=-sigma_z)
     # On-site energy is the same of the scattering region (by now)
     on_site_carbon = OnSiteZeeman()
-    lead_0[lattice.shape(lead_shape, (0,0))] = on_site_carbon
+    lead_0[lattice.shape(shape.leads, (0,0))] = on_site_carbon
 
-    hoppings_list = (((0, 0), a, b), ((0, 1), a, b), ((-1, 1), a, b))
+    hoppings_list = (((0, 0), A, B), ((0, 1), A, B), ((-1, 1), A, B))
     lead_0[(kwant.builder.HoppingKind(*hop) for hop in hoppings_list)] = simple_hopping
-    lead_0.eradicate_dangling()
-    include_ISOC(lead_0, [a,b])
+
+    if shape.pbc:
+        N = shape.N
+        lead_0[A(-N, 2*N), B(0, 0)] = simple_hopping
+    else:
+        lead_0.eradicate_dangling()
+        include_ISOC(lead_0, [A,B])
 
     lead_1 = lead_0.reversed()
-
     lead_0 = lead_0.substituted(peierls='peierls_lead_L')
     lead_1 = lead_1.substituted(peierls='peierls_lead_R')
 
@@ -451,8 +470,8 @@ def insert_adatoms_randomly(system, shape, adatom_concentration, adatom_params):
     CH_sites = list_of_A_sites + list_of_B_sites
 
     all_neighbors = [get_neighbors(system, CH) for CH in CH_sites]
-    all_NN_neighbors = [a[0] for a in all_neighbors]
-    all_NNN_neighbors = [a[1] for a in all_neighbors]
+    all_NN_neighbors = [A[0] for A in all_neighbors]
+    all_NNN_neighbors = [A[1] for A in all_neighbors]
 
     T = adatom_params['T']          #  5.5 eV Fluorine,  7.5 eV Hydrogen: ADATOM-CARBON HOPPING
     epsilon = adatom_params['eps']  # -2.2 eV Fluorine, 0.16 eV Hydrogen: ON-SITE ENERGY FOR ADATOM
@@ -608,19 +627,19 @@ def calculate_conductance(syst, energy_values, params_dict):
 #====================================================================#
 def main():
     ## Define the shape of the system:
-    shape = Rectangle(width=5, length=5)
+    shape = Rectangle(width=5, length=5, pbc=True)
 
     ## Build the scattering region:
     system = make_graphene_strip(graphene, shape)
 
     ## Make the leads:
-    leads  = make_graphene_leads(graphene, shape.leads)
+    leads  = make_graphene_leads(graphene, shape)
 
     ## Attach the leads:
     for lead in leads:
         system.attach_lead(lead)
 
-    pos_tag = (0,0)  # Adatom's tag
+    pos_tag = (1,2)  # Adatom's tag
     sub_lat = A      # Adatom's Sublattice
     adatom_params = dict(T     = 7.5,
                          eps_H = 0.16,

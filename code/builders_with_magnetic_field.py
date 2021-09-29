@@ -198,6 +198,9 @@ Magneton_Bohr = 5.788e-5 # eV/T
 def simple_hopping(Site1, Site2, t, B, Lm, peierls):
     return -t * sigma_0 * peierls(Site1, Site2, B, Lm)
 
+def hopping_pbc(Site1, Site2, t, phi):
+    return -t * sigma_0 * np.exp(-1j*phi)
+
 def peierls_scatter(Site1, Site2, B, Lm):
     """
     This phase factor correspond to the gauge where the magnetic
@@ -362,7 +365,7 @@ def make_graphene_strip(lattice, shape):
         N = shape.N
         M = max(sites_x_tags) + 1
         for i in range(M):
-            syst[A(i-N, 2*N), B(i, 0)] = simple_hopping
+            syst[A(i-N, 2*N), B(i, 0)] = hopping_pbc
     else:
         syst.eradicate_dangling()
         include_ISOC(syst, [A,B])
@@ -385,7 +388,7 @@ def make_graphene_leads(lattice, shape):
 
     if shape.pbc:
         N = shape.N
-        lead_0[A(-N, 2*N), B(0, 0)] = simple_hopping
+        lead_0[A(-N, 2*N), B(0, 0)] = hopping_pbc
     else:
         lead_0.eradicate_dangling()
         include_ISOC(lead_0, [A,B])
@@ -664,6 +667,7 @@ def main():
     Bfield = Bflux / (np.sqrt(3)/2) # sqrt(3)/2 == hexagon area
     parameters_hand = dict(V = 0,
                            t = 2.6,
+                           phi = 0,
                            lambda_iso = 12e-6,
                            B = Bfield,
                            Lm = 3,

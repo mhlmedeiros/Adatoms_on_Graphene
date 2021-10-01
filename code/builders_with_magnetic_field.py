@@ -6,6 +6,50 @@ from itertools import product
 
 
 #====================================================================#
+#                    Lattice definitions                           #
+#====================================================================#
+## Matrix Definitions:
+identity = np.identity(1)
+
+s_0 = np.array([[ 1,  0],[ 0, 1]])
+s_x = np.array([[ 0,  1],[ 1, 0]])
+s_y = np.array([[ 0,-1j],[1j, 0]])
+s_z = np.array([[ 1,  0],[ 0,-1]])
+
+H_J_matrix = tinyarray.array(np.kron(s_x, s_x) + np.kron(s_y, s_y) + np.kron(s_z, s_z))
+
+sigma_0  = tinyarray.array(np.kron(s_0, identity))
+sigma_x  = tinyarray.array(np.kron(s_x, identity))
+sigma_y  = tinyarray.array(np.kron(s_y, identity))
+sigma_z  = tinyarray.array(np.kron(s_z, identity))
+
+## Graphene lattice Definition:
+sin_30 = 1/2
+cos_30 = np.sqrt(3)/2
+
+graphene = kwant.lattice.general([(1, 0), (sin_30, cos_30)], # primitive vectors
+                                 [(0, 0), (0, 1 / np.sqrt(3))],        # coord. of basis atoms
+                                 norbs = 2,                            # number of orbitals per site (spin)
+                                 name='Graphene'                       # name of identification
+                                )
+## Split in sublattices:
+A, B = graphene.sublattices
+
+## Adatom lattice definition:
+hydrogen = kwant.lattice.general([(1, 0), (sin_30, cos_30)],    # primitive vectors
+                                 [(0, 0), (0, 1 / np.sqrt(3))], # coord. of basis atoms
+                                 norbs = 2,
+                                 name='H')
+
+## Split in sublattices
+HA, HB = hydrogen.sublattices
+
+## Physical constants
+g_Lande = 2
+Magneton_Bohr = 5.788e-5 # eV/T
+
+
+#====================================================================#
 #                    Helper classes                                  #
 #====================================================================#
 ## Shape:
@@ -108,60 +152,27 @@ class ISOHoppingFunction:
         return self.sign *  (H_ISO + H_PIA) * peierls(site1, site2, B, Lm)
 
 class OnSiteZeeman:
-    def __init__(self, adatom_onsite=None):
+    def __init__(self, adatom_onsite=None, exchange=0):
         self.adatom_onsite = adatom_onsite
+        self.exchange = exchange
 
     def __call__(self, site, B, Lm, V):
         x, y = site.pos
         Bfunc = Bfield(Bvalue=B, length=Lm)
         H_Z = g_Lande * Magneton_Bohr/2 * Bfunc(x,y) * sigma_z
+        H_J = self.exchange  * H_J_matrix
         if self.adatom_onsite:
             onsite = self.adatom_onsite * sigma_0 + H_Z
         else:
             onsite = V * sigma_0 + H_Z
+        if self.exchange:
+            onsite = onsite + H_J
         return onsite
 
 def w_to_close_pbc(W):
     N = int(max(W // np.sqrt(3), 2))
     w_new = N * np.sqrt(3)
     return w_new, N
-
-#====================================================================#
-#                    Lattice definitions                           #
-#====================================================================#
-## Matrix Definitions:
-zeros_2x2 = tinyarray.array([[0,0],[0,0]])
-sigma_0 = tinyarray.array([[1,0],[0,1]])
-sigma_x = tinyarray.array([[0,1],[1,0]])
-sigma_y = tinyarray.array([[0,-1j],[1j,0]])
-sigma_z = tinyarray.array([[1,0],[0,-1]])
-
-
-## Graphene lattice Definition:
-sin_30 = 1/2
-cos_30 = np.sqrt(3)/2
-
-graphene = kwant.lattice.general([(1, 0), (sin_30, cos_30)], # primitive vectors
-                                 [(0, 0), (0, 1 / np.sqrt(3))],        # coord. of basis atoms
-                                 norbs = 2,                            # number of orbitals per site (spin)
-                                 name='Graphene'                       # name of identification
-                                )
-## Split in sublattices:
-A, B = graphene.sublattices
-
-## Adatom lattice definition:
-hydrogen = kwant.lattice.general([(1, 0), (sin_30, cos_30)],    # primitive vectors
-                                 [(0, 0), (0, 1 / np.sqrt(3))], # coord. of basis atoms
-                                 norbs = 2,
-                                 name='H')
-
-## Split in sublattices
-HA, HB = hydrogen.sublattices
-
-## Physical constants
-g_Lande = 2
-Magneton_Bohr = 5.788e-5 # eV/T
-
 
 #====================================================================#
 #                    Builder's helper functions                      #

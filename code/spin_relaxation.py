@@ -21,17 +21,33 @@ HBAR  = sci.physical_constants['reduced Planck constant in eV s'][0]
 
 
 def spin_flip_probability(smatrix):
+    """
+    This function returns the spin-flip probability per mode for
+        * in-plane spins: gamma_sx and gamma_sy
+        * out-of-plane spins: gamma_sz
+    and the number of propagating modes:
+        * modes_per_spin
+
+    When modes_per_spin == 0, the function returns four zeros.
+
+    """
     modes_per_spin = smatrix.num_propagating(0)/2
-    t_sz_list, r_sz_list = calculate_sz_matrices(smatrix)
-    t_sx_list, r_sx_list = sz_to_sx_matrices(t_sz_list, r_sz_list)
-    t_sy_list, r_sy_list = sz_to_sy_matrices(t_sz_list, r_sz_list)
-    gamma_sz = (la.norm(t_sz_list[1])**2 + la.norm(t_sz_list[2])**2
-             + la.norm(r_sz_list[1])**2 + la.norm(r_sz_list[2])**2)/modes_per_spin
-    gamma_sx = (la.norm(t_sx_list[1])**2 + la.norm(t_sx_list[2])**2
-             + la.norm(r_sx_list[1])**2 + la.norm(r_sx_list[2])**2)/modes_per_spin
-    gamma_sy = (la.norm(t_sy_list[1])**2 + la.norm(t_sy_list[2])**2
-             + la.norm(r_sy_list[1])**2 + la.norm(r_sy_list[2])**2)/modes_per_spin
-    return gamma_sx, gamma_sy, gamma_sz
+
+    if modes_per_spin:
+        t_sz_list, r_sz_list = calculate_sz_matrices(smatrix)
+        t_sx_list, r_sx_list = sz_to_sx_matrices(t_sz_list, r_sz_list)
+        t_sy_list, r_sy_list = sz_to_sy_matrices(t_sz_list, r_sz_list)
+        gamma_sz = (la.norm(t_sz_list[1])**2 + la.norm(t_sz_list[2])**2
+                 + la.norm(r_sz_list[1])**2 + la.norm(r_sz_list[2])**2)/modes_per_spin
+        gamma_sx = (la.norm(t_sx_list[1])**2 + la.norm(t_sx_list[2])**2
+                 + la.norm(r_sx_list[1])**2 + la.norm(r_sx_list[2])**2)/modes_per_spin
+        gamma_sy = (la.norm(t_sy_list[1])**2 + la.norm(t_sy_list[2])**2
+                 + la.norm(r_sy_list[1])**2 + la.norm(r_sy_list[2])**2)/modes_per_spin
+    else:
+        gamma_sx = 0
+        gamma_sy = 0
+        gamma_sz = 0
+    return gamma_sx, gamma_sy, gamma_sz, modes_per_spin
 
 
 def calculate_sz_matrices(smatrix):
@@ -154,7 +170,7 @@ def main():
     H_params_only_ISO = dict(T = 7.5, eps = 0.16, Lambda_I = L_I, Lambda_BR =    0, Lambda_PIA =     0)
     H_params_only_BR  = dict(T = 7.5, eps = 0.16, Lambda_I =   0, Lambda_BR = L_BR, Lambda_PIA =     0)
     H_params_only_PIA = dict(T = 7.5, eps = 0.16, Lambda_I =   0, Lambda_BR =    0, Lambda_PIA = L_PIA)
-    system = bm.insert_adatoms_randomly(system, shape, density_percent, H_params)
+    system = bm.insert_adatoms_randomly(system, shape, density_percent, H_params_only_PIA)
 
 
     ## CALCULATE THE TRANSMISSION COEFFICIENTS
@@ -171,40 +187,50 @@ def main():
 
     # test_matrices(system, 0.4, syst_params)
 
-    n_energy_values = 100 # MAYBE MORE ENERGY VALUES (CLUSTER?)
+    n_energy_values = 101 # MAYBE MORE ENERGY VALUES (CLUSTER?)
     energy_values = np.linspace(-0.4, 0.4, n_energy_values)
     tau_sx = np.empty_like(energy_values)
     tau_sy = np.empty_like(energy_values)
     tau_sz = np.empty_like(energy_values)
 
-    n_phases = 1 ## MAYBE MORE PHASE VALUES (CLUSTER?)
+    n_phases = 20 ## MAYBE MORE PHASE VALUES (CLUSTER?)
     phi_values = np.linspace(0, 2*np.pi, n_phases)
 
     # energy_test = 0.4
     # smatrix = kwant.smatrix(system.finalized(), energy_test, params=syst_params)
     # g_sx, g_sy, g_sz = spin_flip_probability(smatrix)
 
-    CONST = 4*syst_params['t']/HBAR * eta * shape.width
+    CONST = 4 * syst_params['t']/HBAR * eta * shape.width
+
     for ind in range(n_energy_values):
         print("Calculating the smatrix for E = {:2.2f} ... ".format(energy_values[ind]), end='')
         gamma_sx = 0
         gamma_sy = 0
         gamma_sz = 0
+        n_phases_with_propag = 0
+
         for phi in phi_values:
             syst_params["phi"] = phi
             smatrix = kwant.smatrix(system.finalized(), energy_values[ind], params=syst_params)
-            g_sx, g_sy, g_sz = spin_flip_probability(smatrix)
+            g_sx, g_sy, g_sz, modes_per_spin = spin_flip_probability(smatrix)
             gamma_sx += g_sx
             gamma_sy += g_sy
             gamma_sz += g_sz
-        modes_per_spin = smatrix.num_propagating(0)/2
-        tau_sx[ind] = CONST * gamma_sx/n_phases
-        tau_sy[ind] = CONST * gamma_sy/n_phases
-        tau_sz[ind] = CONST * gamma_sz/n_phases
+
+            if modes_per_spin:
+                n_phases_with_propag += 1
+
+        n_phases_with_propag = max(n_phases_with_propag, 1)
+
+        tau_sx[ind] = CONST * gamma_sx/n_phases_with_propag
+        tau_sy[ind] = CONST * gamma_sy/n_phases_with_propag
+        tau_sz[ind] = CONST * gamma_sz/n_phases_with_propag
         print("OK")
 
-    np.savez("spin_relaxation_times_hydrogenated_1_phase_total.npz", energies=energy_values,
-                                                            tau_sx= tau_sx,
+    # TODO: RUN FOR ONLY-PIA:
+    np.savez("../results/spin_relaxation_times_hydrogenated_20_phases_test_only_PIA.npz",
+                                                            energies=energy_values,
+                                                            tau_sx=tau_sx,
                                                             tau_sy=tau_sy,
                                                             tau_sz=tau_sz,
     )

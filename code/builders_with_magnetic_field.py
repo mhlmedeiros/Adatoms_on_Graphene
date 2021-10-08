@@ -9,7 +9,8 @@ from itertools import product
 #                    Lattice definitions                           #
 #====================================================================#
 ## Matrix Definitions:
-identity = np.identity(1)
+N_SPIN_DEGREE_OF_FREEDOM = 2
+identity = np.identity(N_SPIN_DEGREE_OF_FREEDOM)
 
 s_0 = np.array([[ 1,  0],[ 0, 1]])
 s_x = np.array([[ 0,  1],[ 1, 0]])
@@ -27,19 +28,20 @@ sigma_z  = tinyarray.array(np.kron(s_z, identity))
 sin_30 = 1/2
 cos_30 = np.sqrt(3)/2
 
-graphene = kwant.lattice.general([(1, 0), (sin_30, cos_30)], # primitive vectors
+graphene = kwant.lattice.general([(1, 0), (sin_30, cos_30)],           # primitive vectors
                                  [(0, 0), (0, 1 / np.sqrt(3))],        # coord. of basis atoms
-                                 norbs = 2,                            # number of orbitals per site (spin)
+                                 norbs = 2 * N_SPIN_DEGREE_OF_FREEDOM, # number of orbitals per site (spin)
                                  name='Graphene'                       # name of identification
                                 )
 ## Split in sublattices:
 A, B = graphene.sublattices
 
 ## Adatom lattice definition:
-hydrogen = kwant.lattice.general([(1, 0), (sin_30, cos_30)],    # primitive vectors
-                                 [(0, 0), (0, 1 / np.sqrt(3))], # coord. of basis atoms
-                                 norbs = 2,
-                                 name='H')
+hydrogen = kwant.lattice.general([(1, 0), (sin_30, cos_30)],           # primitive vectors
+                                 [(0, 0), (0, 1 / np.sqrt(3))],        # coord. of basis atoms
+                                 norbs = 2 * N_SPIN_DEGREE_OF_FREEDOM, # number of orbitals per site (spin)
+                                 name='H'                              # name of identification
+                                 )
 
 ## Split in sublattices
 HA, HB = hydrogen.sublattices
@@ -140,6 +142,7 @@ class HoppingFunction:
         HSOC = self.soc_hopping_matrix
         return self.sign * (H0 + HSOC) * peierls(site1, site2, B, Lm)
 
+
 class ISOHoppingFunction:
     def __init__(self, isoc_hopping_matrix, pia_hopping_matrix=0, sign=+1):
         self.isoc_hopping_matrix = isoc_hopping_matrix
@@ -151,6 +154,7 @@ class ISOHoppingFunction:
         H_PIA = self.pia_hopping_matrix
         return self.sign *  (H_ISO + H_PIA) * peierls(site1, site2, B, Lm)
 
+
 class OnSiteZeeman:
     def __init__(self, adatom_onsite=None, exchange=0):
         self.adatom_onsite = adatom_onsite
@@ -160,57 +164,44 @@ class OnSiteZeeman:
         x, y = site.pos
         Bfunc = Bfield(Bvalue=B, length=Lm)
         H_Z = g_Lande * Magneton_Bohr/2 * Bfunc(x,y) * sigma_z
-        H_J = self.exchange  * H_J_matrix
+        H_J = self.exchange * H_J_matrix
         if self.adatom_onsite:
             onsite = self.adatom_onsite * sigma_0 + H_Z
         else:
             onsite = V * sigma_0 + H_Z
-        if self.exchange:
-            onsite = onsite + H_J
+        if self.exchange and N_SPIN_DEGREE_OF_FREEDOM == 2:
+            onsite = onsite - H_J
         return onsite
+
+
+class SiteTest:
+    def __init__(self, x, y):
+        self.pos = (x, y)
+
+
+# site_test = SiteTest(0,0)
+# H_onsite = OnSiteZeeman(adatom_onsite=0.16, exchange=0.4)
+# print(H_onsite(site_test, B=0, Lm=0, V=0))
+
 
 def w_to_close_pbc(W):
     N = int(max(W // np.sqrt(3), 2))
     w_new = N * np.sqrt(3)
     return w_new, N
 
+
 #====================================================================#
 #                    Builder's helper functions                      #
 #====================================================================#
-## Zeeman:
-# def on_site_with_Zeeman(site, V, B, Lm):
-#     """
-#     This function defines the on-site energy by
-#     allowing to pass functions of position for
-#     the electrical potential and the magnetic field
-#     separately in order to account for the Zeeman
-#     effect.
-#     """
-#     x, y = site.pos
-#     Bfunc = Bfield(Bvalue=B, length=Lm)
-#     H_Z = g_Lande * Magneton_Bohr/2 * Bfunc(x,y) * sigma_z
-#     return V * sigma_0 + H_Z
-#
-# def on_site_H_with_Zeeman(site, eps_H, B, Lm):
-#     """
-#     This function is essentially a copy of 'on_site_with_Zeeman' with the
-#     difference that here, the on-site energy is given by
-#         * eps_H = on-site energy for the adatoms
-#     instead of
-#         * V = on-site for the carbon atoms
-#     """
-#     x, y = site.pos
-#     Bfunc = Bfield(Bvalue=B, length=Lm)
-#     H_Z = g_Lande * Magneton_Bohr/2 * Bfunc(x,y) * sigma_z
-#     return eps_H * sigma_0 + H_Z
-
 
 ## Peierls substitution:
 def simple_hopping(Site1, Site2, t, B, Lm, peierls):
     return -t * sigma_0 * peierls(Site1, Site2, B, Lm)
 
+
 def hopping_pbc(Site1, Site2, t, phi):
     return -t * sigma_0 * np.exp(-1j*phi)
+
 
 def peierls_scatter(Site1, Site2, B, Lm):
     """
@@ -226,6 +217,7 @@ def peierls_scatter(Site1, Site2, B, Lm):
         theta = -B/2 * (x_i - x_j) * (y_i + y_j)
     return np.exp(2j*np.pi*theta)
 
+
 def peierls_lead_L(Site1, Site2, B, Lm):
     """
     When 'peierls_scatter' is used, this has to be the
@@ -237,6 +229,7 @@ def peierls_lead_L(Site1, Site2, B, Lm):
     else: theta = -B/2 * (x_i - x_j) * (y_i + y_j)
     return np.exp(2j*np.pi*theta)
 
+
 def peierls_lead_R(Site1, Site2, B, Lm):
     """
     When 'peierls_scatter' is used, this has to be the
@@ -247,6 +240,7 @@ def peierls_lead_R(Site1, Site2, B, Lm):
     if Lm: theta = B/2 * Lm * (y_i - y_j)
     else: theta = -B/2 * (x_i - x_j) * (y_i + y_j)
     return np.exp(-2j*np.pi*theta)
+
 
 def change_x(x, Lm):
     if Lm:
@@ -270,6 +264,7 @@ def get_neighbors(system, C_H_site):
     nn_list = get_nn(system, site_tag, site_sub)
     nnn_list = get_nnn(system, site_tag, site_sub)
     return [nn_list, nnn_list]
+
 
 def get_nn(system, tag, sub_s):
     """
@@ -295,6 +290,7 @@ def get_nn(system, tag, sub_s):
 #         print(site)
     return nn_sites
 
+
 def get_nnn(system, tag, sub_s):
     """
     system := kwant.builder.Builder
@@ -316,6 +312,7 @@ def get_nnn(system, tag, sub_s):
 #         print(site)
     return nnn_sites
 
+
 def get_adatom_AB_positions(total_number_of_adatoms, allowed_sites):
     A_adatoms_to_place = total_number_of_adatoms // 2
     B_adatoms_to_place = total_number_of_adatoms - A_adatoms_to_place
@@ -336,11 +333,13 @@ def get_adatom_AB_positions(total_number_of_adatoms, allowed_sites):
             break
     return list_of_A_adatoms, list_of_B_adatoms, allowed_sites
 
+
 def exclude_neighboring_sites(adatom_site, list_of_sites, radius=2):
     sites_to_exclude = neighboring_sites(adatom_site, list_of_sites, radius)
     for site in sites_to_exclude:
         list_of_sites.remove(site)
     return list_of_sites
+
 
 def neighboring_sites(adatom_site, list_of_sites, radius):
     list_of_neighboring_sites = []
@@ -383,13 +382,19 @@ def make_graphene_strip(lattice, shape):
 
     return syst
 
+
 def make_graphene_leads(lattice, shape):
     A, B = lattice.sublattices
     symmetry = kwant.TranslationalSymmetry((-1,0))
     symmetry.add_site_family(A, other_vectors=[(-1,2)])
     symmetry.add_site_family(B, other_vectors=[(-1,2)])
 
-    lead_0 = kwant.Builder(symmetry, conservation_law=-sigma_z)
+    if N_SPIN_DEGREE_OF_FREEDOM == 1 :
+        lead_0 = kwant.Builder(symmetry, conservation_law=-sigma_z)
+    else:
+        sigma_tilde = np.diag(np.linspace(1, 4, 4)) # DIAG([1, 2, 3, 4])
+        lead_0 = kwant.Builder(symmetry, conservation_law=sigma_tilde)
+
     # On-site energy is the same of the scattering region (by now)
     on_site_carbon = OnSiteZeeman()
     lead_0[lattice.shape(shape.leads, (0,0))] = on_site_carbon
@@ -409,6 +414,7 @@ def make_graphene_leads(lattice, shape):
     lead_1 = lead_1.substituted(peierls='peierls_lead_R')
 
     return [lead_0, lead_1]
+
 
 def include_ISOC(system, G_sub_lattices):
     """
@@ -462,6 +468,7 @@ def insert_adatom(syst, pos_tag, sub_lat, eps_H=1, T=1, L_I=1, L_BR=1, L_PIA=1):
     for site1, site2 in zip(targets, nn_sites):
         include_PIA_sitewise(syst, site1, site2, Lambda_PIA=L_PIA)
 
+
 def insert_adatoms_randomly(system, shape, adatom_concentration, adatom_params):
     """
     It is the almost the same function defined in "Periodic_Boundary_Conditions.py",
@@ -489,7 +496,8 @@ def insert_adatoms_randomly(system, shape, adatom_concentration, adatom_params):
 
     T = adatom_params['T']          #  5.5 eV Fluorine,  7.5 eV Hydrogen: ADATOM-CARBON HOPPING
     epsilon = adatom_params['eps']  # -2.2 eV Fluorine, 0.16 eV Hydrogen: ON-SITE ENERGY FOR ADATOM
-    on_site_adatom = OnSiteZeeman(adatom_onsite=epsilon)
+    J_exchange = adatom_params['exchange']
+    on_site_adatom = OnSiteZeeman(adatom_onsite=epsilon, exchange=J_exchange)
 
     for tagA in A_adatoms_tags:
         system[HA(*tagA)] = on_site_adatom     # on-site
@@ -516,22 +524,26 @@ def insert_adatoms_randomly(system, shape, adatom_concentration, adatom_params):
     # print("OK")
     return system
 
+
 # FOR ALL ADATOMS:
 def include_all_ASO(system, all_CH_sites, all_NNN_neighbors, Lambda_I=1):
     for CH_site, NNN_sites in zip(all_CH_sites, all_NNN_neighbors):
         for NNN_site in NNN_sites:
             include_ASO_sitewise(system, CH_site, NNN_site, Lambda_I)
 
+
 def include_all_BR(system, all_CH_sites, all_NN_neighbors, Lambda_BR=1):
     for CH_site, NN_sites in zip(all_CH_sites, all_NN_neighbors):
         for NN_site in NN_sites:
             include_BR_sitewise(system, CH_site, NN_site, Lambda_BR)
+
 
 def include_all_PIA(system, all_NN_neighbors, Lambda_PIA=1):
     for NN_sites in all_NN_neighbors:
         targets = [NN_sites[(i+1)%3] for i in range(3)]
         for site1, site2 in zip(targets, NN_sites):
             include_PIA_sitewise(system, site1, site2, Lambda_PIA)
+
 
 # FOR EVERY ADATOM
 def include_ASO_sitewise(system, CH_site, NNN_site, Lambda_I=1):
@@ -553,6 +565,7 @@ def include_ASO_sitewise(system, CH_site, NNN_site, Lambda_I=1):
 
     system[CH_site, NNN_site] = H_asoc
 
+
 def include_BR_sitewise(system, CH_site, NN_site, Lambda_BR=1):
     """
     Update the hopping between the CH_site and the NN_site to include
@@ -565,6 +578,7 @@ def include_BR_sitewise(system, CH_site, NN_site, Lambda_BR=1):
     H_BR = HoppingFunction(soc_hopping_matrix = H_BR_matrix, simple_hopping_matrix = sigma_0, sign=+1)
     # 3. (Re)Define the hopping including BR-SOC
     system[CH_site, NN_site] = H_BR
+
 
 def include_PIA_sitewise(system, site_target, site_source, Lambda_PIA=1):
     """
@@ -594,6 +608,7 @@ def include_PIA_sitewise(system, site_target, site_source, Lambda_PIA=1):
 
     system[site_target, site_source] = H_PIA_ISO
 
+
 #====================================================================#
 #                          Plotting helpers                          #
 #====================================================================#
@@ -604,8 +619,10 @@ def hopping_colors(site1, site2):
         color='black'
     return color
 
+
 def hopping_lw(site1, site2):
     return 0.04 if site1.family == site2.family else 0.1
+
 
 def family_colors(site):
         if site.family == A:
@@ -660,18 +677,18 @@ def main():
                          L_I   = -0.21e-3,
                          L_BR  = 0.33e-3,
                          L_PIA = -0.77e-3)
-    insert_adatom(system, pos_tag, sub_lat,  **adatom_params)
+    # insert_adatom(system, pos_tag, sub_lat,  **adatom_params)
 
 
     # Figure
-    fig, ax = plt.subplots(figsize=(20,5))
-    kwant.plot(system,
-               site_color=family_colors,
-               hop_color=hopping_colors,
-               hop_lw=hopping_lw,
-               site_lw=0.1, ax=ax)
-    ax.set_aspect('equal')
-    plt.show()
+    # fig, ax = plt.subplots(figsize=(20,5))
+    # kwant.plot(system,
+    #            site_color=family_colors,
+    #            hop_color=hopping_colors,
+    #            hop_lw=hopping_lw,
+    #            site_lw=0.1, ax=ax)
+    # ax.set_aspect('equal')
+    # plt.show()
 
     # Calculate the transmission
     Bflux = 0.     # in units of quantum of magnetic flux
@@ -685,14 +702,67 @@ def main():
                            peierls = peierls_scatter,
                            peierls_lead_L = peierls_lead_L,
                            peierls_lead_R = peierls_lead_R)
-    energy_values = np.linspace(-5, 5, 300)
-    transmission1 = calculate_conductance(system, energy_values,
-                                         params_dict=parameters_hand)
+    # energy_values = np.linspace(-5, 5, 300)
+    # transmission1 = calculate_conductance(system, energy_values,
+    #                                      params_dict=parameters_hand)
+    #
+    # # PLOT THE CONDUCTION
+    # plt.plot(energy_values, transmission1)
+    # # plt.plot(energy_values, transmission2)
+    # plt.show()
 
-    # PLOT THE CONDUCTION
-    plt.plot(energy_values, transmission1)
-    # plt.plot(energy_values, transmission2)
-    plt.show()
+    smatrix = kwant.smatrix(system.finalized(), 0.4, params=parameters_hand)
+    modes_per_spin = smatrix.num_propagating(0)/4 ## DIVIDING ONLY AMONG ELECTRONIC SPINS
+    # modes_per_spin = 1
+
+    ## THE EXTRA DIVISION BY 2 REQUIRES CLARIFICATION, BUT IT HAS TO DO WITH THE DENSITY MATRIX
+    ## OF AN UNPOLARIZED SYSTEM \rho =  1/2 |UP)(UP| + 1/2 |DN)(DN|
+    ## ADOPTED WHEN TRANCING OUT THE IMPURITY SPIN DEGREE OF FREEDOM:
+    T_up_up = np.linalg.norm(1/2 * (smatrix.submatrix((1,0), (0,0)) + smatrix.submatrix((1,1), (0,1))))**2 * 1/modes_per_spin
+    T_up_dn = np.linalg.norm(smatrix.submatrix((1,0), (0,2)) + smatrix.submatrix((1,1), (0,3)))**2/2/modes_per_spin
+    T_dn_up = np.linalg.norm(smatrix.submatrix((1,2), (0,0)) + smatrix.submatrix((1,3), (0,1)))**2/2/modes_per_spin
+    T_dn_dn = np.linalg.norm(smatrix.submatrix((1,2), (0,2)) + smatrix.submatrix((1,3), (0,3)))**2/2/modes_per_spin
+    print("\nT_sz = \n[[{:.3f}, {:.3f}],\n[{:.3f}, {:.3f}]]".format(T_up_up, T_up_dn, T_dn_up, T_dn_dn))
+
+    R_up_up = np.linalg.norm(smatrix.submatrix((0,0), (0,0)) + smatrix.submatrix((0,1), (0,1)))**2/2/modes_per_spin
+    R_up_dn = np.linalg.norm(smatrix.submatrix((0,0), (0,2)) + smatrix.submatrix((0,1), (0,3)))**2/2/modes_per_spin
+    R_dn_up = np.linalg.norm(smatrix.submatrix((0,2), (0,0)) + smatrix.submatrix((0,3), (0,1)))**2/2/modes_per_spin
+    R_dn_dn = np.linalg.norm(smatrix.submatrix((0,2), (0,2)) + smatrix.submatrix((0,3), (0,3)))**2/2/modes_per_spin
+    print("\nR_sz = \n[[{:.3f}, {:.3f}],\n[{:.3f}, {:.3f}]]".format(R_up_up, R_up_dn, R_dn_up, R_dn_dn))
+
+    total_transmission = smatrix.transmission(1,0)
+    total_reflection = smatrix.transmission(0,0)
+    propagating_modes = 1 #smatrix.num_propagating(0)/4
+
+    print(f"\nNumber of propagating modes = {smatrix.num_propagating(0)}")
+    print(f"Total transmission = {total_transmission}")
+    print(f"Total reflection = {total_reflection}")
+    print(f"T + R = {total_transmission + total_reflection}\n")
+
+
+    T_upUp_upUp = smatrix.transmission((1,0),(0,0))/propagating_modes
+    R_upUp_upUp = smatrix.transmission((0,0),(0,0))/propagating_modes
+
+    T_upDn_upDn = smatrix.transmission((1,1),(0,1))/propagating_modes
+    R_upDn_upDn = smatrix.transmission((0,1),(0,1))/propagating_modes
+
+    T_dnUp_dnUp = smatrix.transmission((1,2),(0,2))/propagating_modes
+    R_dnUp_dnUp = smatrix.transmission((0,2),(0,2))/propagating_modes
+
+    T_dnDn_dnDn = smatrix.transmission((1,3),(0,3))/propagating_modes
+    R_dnDn_dnDn = smatrix.transmission((0,3),(0,3))/propagating_modes
+
+    print("T_upUp_upUp = {:.3f}\nR_upUp_upUp = {:.3f}\n".format(T_upUp_upUp, R_upUp_upUp))
+    print("T_upUp_upUp + R_upUp_upUp = {:.3f}\n".format(T_upUp_upUp + R_upUp_upUp))
+
+    print("T_upDn_upDn = {:.3f}\nR_upDn_upDn = {:.3f}\n".format(T_upDn_upDn, R_upDn_upDn))
+    print("T_upDn_upDn + R_upDn_upDn = {:.3f}\n".format(T_upDn_upDn + R_upDn_upDn))
+
+    print("T_dnUp_dnUp = {:.3f}\nR_dnUp_dnUp = {:.3f}\n".format(T_dnUp_dnUp, R_dnUp_dnUp))
+    print("T_dnUp_dnUp + R_dnUp_upUp = {:.3f}\n".format(T_dnUp_dnUp + R_dnUp_dnUp))
+
+    print("T_dnDn_dnDn = {:.3f}\nR_dnDn_dnDn = {:.3f}\n".format(T_dnDn_dnDn, R_dnDn_dnDn))
+    print("T_dnDn_upDn + R_dnDn_upDn = {:.3f}\n".format(T_dnDn_dnDn + R_dnDn_dnDn))
 
 
 if __name__ == '__main__':

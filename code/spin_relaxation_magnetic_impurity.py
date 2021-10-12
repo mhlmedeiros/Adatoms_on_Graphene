@@ -118,6 +118,60 @@ def transmission_matrices(smatrix, lead_source, lead_target):
     return s_up_up, s_up_down, s_down_up, s_down_down
 
 
+################################################################################
+#                  FUNCTIONS TO CONSIDER BOTH SPIN-FLIPS:                      #
+################################################################################
+
+def spin_relaxation_imp(system, energies, syst_params, n_phases=20):
+    CONST = 4 * syst_params['t']/HBAR * syst_params['eta'] * syst_params['width']
+    tau_inv = np.empty_like(energies)
+    phi_values = np.linspace(0, 2*np.pi, n_phases)
+
+
+    for i, energy in enumerate(energies):
+        print("Calculating the smatrix for E = {:2.2f} ... ".format(energy), end='')
+        gamma_sz = 0
+        n_phases_with_propag = 0
+
+        for phi in phi_values:
+            syst_params["phi"] = phi
+            smatrix = kwant.smatrix(system.finalized(), energy, params=syst_params)
+            g_sz, modes_per_spin = spin_flip_probability_imp(smatrix) ## the sonly diff from 'calculate_relaxation_time'
+            gamma_sz += g_sz
+
+            if modes_per_spin:
+                n_phases_with_propag += 1
+
+        n_phases_with_propag = max(n_phases_with_propag, 1)
+
+        tau_inv[i] = CONST * gamma_sz/n_phases_with_propag
+        print("OK")
+    return tau_inv
+
+
+def spin_flip_probability_imp(smatrix):
+    modes_per_spin = 2* smatrix.num_propagating(0)/4
+    if modes_per_spin:
+        transmission = scattering_amplitude_imp(smatrix, 0, 1)
+        reflection = scattering_amplitude_imp(smatrix, 0, 0)
+        probability = 1/modes_per_spin * (la.norm(transmission)**2 + la.norm(reflection)**2)
+    else:
+        probability = 0
+    return probability, modes_per_spin
+
+
+def scattering_amplitude_imp(smatrix, lead_source, lead_target):
+    """
+    Calculate the scattering amplitude for both electron and impurity
+    spin to flip.
+    """
+    return 1/2 *(smatrix.submatrix((lead_target, 1), (lead_source, 2)) +
+                 smatrix.submatrix((lead_target, 2), (lead_source, 1)))
+
+
+################################################################################
+#                          FUNCTIONS TO PERFORM TESTS:                         #
+################################################################################
 def test_matrices(system, energy, params):
     smatrix = kwant.smatrix(system.finalized(), energy, params=params)
     modes_per_spin = smatrix.num_propagating(0)/4
@@ -161,12 +215,12 @@ def main():
     L_PIA = -0.77e-3  ## [eV] PSEUDO INVERSION ASYMMETRY
     J_exchange = -0.4 ## [eV] Exchange
 
-    H_params = dict(T = 7.5, eps = 0.16, Lambda_I = L_I, Lambda_BR = L_BR, Lambda_PIA = L_PIA)
-    # H_params_with_J = dict(T = 7.5, eps = 0.16, Lambda_I = 0, Lambda_BR = 0, Lambda_PIA = 0, exchange = J_exchange)
+    # H_params = dict(T = 7.5, eps = 0.16, Lambda_I = L_I, Lambda_BR = L_BR, Lambda_PIA = L_PIA)
+    H_params_with_J = dict(T = 7.5, eps = 0.16, Lambda_I = 0, Lambda_BR = 0, Lambda_PIA = 0, exchange = J_exchange)
     # H_params_only_ISO = dict(T = 7.5, eps = 0.16, Lambda_I = L_I, Lambda_BR =    0, Lambda_PIA =     0)
     # H_params_only_BR  = dict(T = 7.5, eps = 0.16, Lambda_I =   0, Lambda_BR = L_BR, Lambda_PIA =     0)
     # H_params_only_PIA = dict(T = 7.5, eps = 0.16, Lambda_I =   0, Lambda_BR =    0, Lambda_PIA = L_PIA)
-    system = bm.insert_adatoms_randomly(system, shape, density_percent, H_params)
+    system = bm.insert_adatoms_randomly(system, shape, density_percent, H_params_with_J)
 
 
     # CALCULATE THE TRANSMISSION COEFFICIENTS
@@ -209,11 +263,12 @@ def main():
 
 
     n_energy_values = 101
-    energy_values = np.linspace(-0.4, 0.4, n_energy_values)
-    tau_inv = calculate_relaxation_time(system, energy_values, syst_params, n_phases=20)
+    energy_values = np.linspace(-0.2, 0.2, n_energy_values)
+    # tau_inv = calculate_relaxation_time(system, energy_values, syst_params, n_phases=20)
+    tau_inv = spin_relaxation_imp(system, energy_values, syst_params, n_phases=20)
 
 
-    np.savez("../results/spin_relaxation_magnetic_moment_times_hydrogenated_20_phases_new.npz",
+    np.savez("../results/spin_relaxation_magnetic_moment_times_hydrogenated_20_phase_range_0,2_both_spin_flips.npz",
             energies=energy_values,
             tau_sz=tau_inv
     )

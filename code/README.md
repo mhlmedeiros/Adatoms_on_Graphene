@@ -184,7 +184,7 @@ $$
 \mathbb{S}_{i,j}(E) = 
 \begin{bmatrix}
 S_{\uparrow\Uparrow,\uparrow\Uparrow} & S_{\uparrow\Uparrow,\uparrow\Downarrow}& S_{\uparrow\Uparrow,\downarrow\Uparrow}& S_{\uparrow\Uparrow,\downarrow\Downarrow}\\
-S_{\uparrow\Downarrow,\uparrow\Uparrow} & S_{\uparrow\Downarrow,\uparrow\Downarrow}& S_{\uparrow\Downarrow,\downarrow\Uparrow}& S_{\Downarrow\Uparrow,\downarrow\Downarrow}\\
+S_{\uparrow\Downarrow,\uparrow\Uparrow} & S_{\uparrow\Downarrow,\uparrow\Downarrow}& S_{\uparrow\Downarrow,\downarrow\Uparrow}& S_{\uparrow\Downarrow,\downarrow\Downarrow}\\
 S_{\downarrow\Uparrow,\uparrow\Uparrow} & S_{\downarrow\Uparrow,\uparrow\Downarrow}& S_{\downarrow\Uparrow,\downarrow\Uparrow}& S_{\downarrow\Uparrow,\downarrow\Downarrow}\\
 S_{\downarrow\Downarrow,\uparrow\Uparrow} & S_{\downarrow\Downarrow,\uparrow\Downarrow}& S_{\downarrow\Downarrow,\downarrow\Uparrow}& S_{\downarrow\Downarrow,\downarrow\Downarrow}
 \end{bmatrix}
@@ -204,7 +204,7 @@ To get rid of the impurity spin degree of freedom, **one have to trace it out**.
 
 * The transmission (reflection) amplitudes are given by the partial trace over the impurity spin space, considering the density matrix of an unpolarized state:
   $$
-  \rho_B = \frac{1}{2}(\Ket{\Uparrow}\Bra{\Uparrow} + \Ket{\Downarrow}{\Downarrow})
+  \rho_B = \frac{1}{2}(\Ket{\Uparrow}\Bra{\Uparrow} + \Ket{\Downarrow}\Bra{{\Downarrow}})
   $$
 
 * The partial trace over the impurity spin space is performed as follows:
@@ -255,6 +255,11 @@ To get rid of the impurity spin degree of freedom, **one have to trace it out**.
   \end{eqnarray}
   $$
 
+
+
+
+Translating into the Kwant syntax, where we have: 
+
 * $S_{\uparrow\Uparrow, \uparrow\Uparrow} = $ `smatrix.submatrix((i,0), (j,0))`, $S_{\uparrow\Downarrow, \uparrow\Downarrow} = $ `smatrix.submatrix((i,1), (j,1))`
 
 * $S_{\uparrow\Uparrow, \downarrow\Uparrow} = $ `smatrix.submatrix((i,0), (j,2))`, $S_{\uparrow\Downarrow, \downarrow\Downarrow} = $ `smatrix.submatrix((i,1), (j,3))`
@@ -263,7 +268,8 @@ To get rid of the impurity spin degree of freedom, **one have to trace it out**.
 
 * $S_{\downarrow \Uparrow, \uparrow\Uparrow} = $ `smatrix.submatrix((i,2), (j,2))`, $S_{\downarrow\Downarrow, \downarrow\Downarrow} = $ `smatrix.submatrix((i,3), (j,3))`
 
-  
+
+The matrix elements that will be important to us (those with electron spin flip)
 
 
 ```python

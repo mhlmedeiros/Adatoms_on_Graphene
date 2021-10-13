@@ -14,6 +14,16 @@ HBAR  = sci.physical_constants['reduced Planck constant in eV s'][0]
 
 
 def calculate_relaxation_time(system, energies, syst_params, n_phases=20):
+    """
+    Calculate the inverse of spin relaxation time for each value of energy given.
+
+    :param system: kwant.Builder
+    :param energies: numpy.Array
+    :param syst_params: dict
+    :param n_phases: int
+
+    :return tau_inv: numpy.Array
+    """
 
     CONST = 4 * syst_params['t']/HBAR * syst_params['eta'] * syst_params['width']
     tau_inv = np.empty_like(energies)
@@ -215,11 +225,11 @@ def main():
     L_PIA = -0.77e-3  ## [eV] PSEUDO INVERSION ASYMMETRY
     J_exchange = -0.4 ## [eV] Exchange
 
-    # H_params = dict(T = 7.5, eps = 0.16, Lambda_I = L_I, Lambda_BR = L_BR, Lambda_PIA = L_PIA)
+    H_params = dict(T = 7.5, eps = 0.16, Lambda_I = L_I, Lambda_BR = L_BR, Lambda_PIA = L_PIA, exchange = J_exchange)
     H_params_with_J = dict(T = 7.5, eps = 0.16, Lambda_I = 0, Lambda_BR = 0, Lambda_PIA = 0, exchange = J_exchange)
-    # H_params_only_ISO = dict(T = 7.5, eps = 0.16, Lambda_I = L_I, Lambda_BR =    0, Lambda_PIA =     0)
-    # H_params_only_BR  = dict(T = 7.5, eps = 0.16, Lambda_I =   0, Lambda_BR = L_BR, Lambda_PIA =     0)
-    # H_params_only_PIA = dict(T = 7.5, eps = 0.16, Lambda_I =   0, Lambda_BR =    0, Lambda_PIA = L_PIA)
+    H_params_only_ISO = dict(T = 7.5, eps = 0.16, Lambda_I = L_I, Lambda_BR =    0, Lambda_PIA =     0, exchange = J_exchange)
+    H_params_only_BR  = dict(T = 7.5, eps = 0.16, Lambda_I =   0, Lambda_BR = L_BR, Lambda_PIA =     0, exchange = J_exchange)
+    H_params_only_PIA = dict(T = 7.5, eps = 0.16, Lambda_I =   0, Lambda_BR =    0, Lambda_PIA = L_PIA, exchange = J_exchange)
     system = bm.insert_adatoms_randomly(system, shape, density_percent, H_params_with_J)
 
 
@@ -239,27 +249,7 @@ def main():
                     Lm=0
     )
 
-    # BEGIN TEST
-    # pos_tag = (1,2)  # Adatom's tag
-    # sub_lat = bm.A      # Adatom's Sublattice
-    # adatom_params = dict(T     = 7.5,
-    #                      eps_H = 0.16,
-    #                      L_I   = -0.21e-3,
-    #                      L_BR  = 0.33e-3,
-    #                      L_PIA = -0.77e-3)
-    # bm.insert_adatom(system, pos_tag, sub_lat,  **adatom_params)
-    # # Figure
-    # fig, ax = plt.subplots(figsize=(20,5))
-    # kwant.plot(system,
-    #     site_color=bm.family_colors,
-    #     hop_color=bm.hopping_colors,
-    #     hop_lw=bm.hopping_lw,
-    #     site_lw=0.1, ax=ax
-    # )
-    # ax.set_aspect('equal')
-    # plt.show()
-    # test_matrices(system, 0.4, syst_params)
-    # END TEST
+
 
 
     n_energy_values = 101
@@ -273,22 +263,8 @@ def main():
             tau_sz=tau_inv
     )
 
-    # data = np.load("../results/spin_relaxation_magnetic_moment_times_hydrogenated_20_phases_exchange_0,4.npz")
-    # data_E = data['energies']
-    # data_tau = data['tau_sz']
-    # CONST = 4 * syst_params['t']/HBAR * syst_params['eta'] * syst_params['width']
-    # new_data_tau = data_tau/CONST
-    #
-    # print('Saving...', end=' ')
-    # np.savez("../results/spin_relaxation_magnetic_moment_times_hydrogenated_20_phases_exchange_0,4_without_CONST.npz",
-    #         energies=data_E,
-    #         tau_sz=new_data_tau
-    # )
-    # print('done')
-
 
 
 
 if __name__ == '__main__':
-    # data = np.load("../results/spin_relaxation_magnetic_moment_times_hydrogenated_20_phases_exchange_0,4.npz")
     main()

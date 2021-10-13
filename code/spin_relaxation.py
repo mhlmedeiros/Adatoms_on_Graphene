@@ -18,6 +18,51 @@ plt.rc('text', usetex=True)
 
 HBAR  = sci.physical_constants['reduced Planck constant in eV s'][0]
 
+def calculate_relaxation_time(system, energies, syst_params, n_phases=20):
+    """
+    Calculate the inverse of spin relaxation time for each value of energy given,
+    for every three directions of spin: Sx, Sy and Sz
+
+    :param system: kwant.Builder
+    :param energies: numpy.Array
+    :param syst_params: dict
+    :param n_phases: int
+
+    :return tau_sx: numpy.Array
+    :return tau_sy: numpy.Array
+    :return tau_sz: numpy.Array
+    """
+
+    CONST = 4 * syst_params['t']/HBAR * syst_params['eta'] * syst_params['width']
+    tau_sx = np.empty_like(energies)
+    tau_sy = np.empty_like(energies)
+    tau_sz = np.empty_like(energies)
+    phi_values = np.linspace(0, 2*np.pi, n_phases)
+
+    for i, energy in enumerate(energies):
+        print("Calculating the smatrix for E = {:2.2f} ... ".format(energy), end='')
+        gamma_sx = 0
+        gamma_sy = 0
+        gamma_sz = 0
+        n_phases_with_propag = 0
+
+        for phi in phi_values:
+            syst_params["phi"] = phi
+            smatrix = kwant.smatrix(system.finalized(), energy, params=syst_params)
+            prob_sx, prob_sy, prob_sz, modes_per_spin = spin_flip_probability(smatrix)
+            gamma_sx += prob_sx
+            gamma_sy += prob_sy
+            gamma_sz += prob_sz
+            if modes_per_spin:
+                n_phases_with_propag += 1
+
+        n_phases_with_propag = max(n_phases_with_propag, 1)
+        tau_sx[i] = CONST * gamma_sx/n_phases_with_propag
+        tau_sy[i] = CONST * gamma_sy/n_phases_with_propag
+        tau_sz[i] = CONST * gamma_sz/n_phases_with_propag
+        print("OK")
+    return tau_sx, tau_sy, tau_sz
+
 
 
 def spin_flip_probability(smatrix):
@@ -116,6 +161,30 @@ def transmission_matrices(smatrix, lead_source, lead_target):
     return T_uu, T_ud, T_du, T_dd
 
 
+def simple_test(system):
+    # BEGIN TEST
+    pos_tag = (1,2)  # Adatom's tag
+    sub_lat = bm.A      # Adatom's Sublattice
+    adatom_params = dict(T     = 7.5,
+                         eps_H = 0.16,
+                         L_I   = -0.21e-3,
+                         L_BR  = 0.33e-3,
+                         L_PIA = -0.77e-3)
+    bm.insert_adatom(system, pos_tag, sub_lat,  **adatom_params)
+    # Figure
+    fig, ax = plt.subplots(figsize=(20,5))
+    kwant.plot(system,
+        site_color=bm.family_colors,
+        hop_color=bm.hopping_colors,
+        hop_lw=bm.hopping_lw,
+        site_lw=0.1, ax=ax
+    )
+    ax.set_aspect('equal')
+    plt.show()
+    test_matrices(system, 0.4, syst_params)
+    # END TEST
+
+
 def show_matrices(t_list, r_list, modes_per_spin, spin='z'):
     T_prob = [la.norm(T)**2/modes_per_spin for T in t_list]
     R_prob = [la.norm(R)**2/modes_per_spin for R in r_list]
@@ -166,16 +235,18 @@ def main():
     L_BR  =  0.33e-3 ## RASHBA SOC
     L_PIA = -0.77e-3 ## PSEUDO INVERSION ASYMMETRY
 
-    H_params = dict(T = 7.5, eps = 0.16, Lambda_I = L_I, Lambda_BR = L_BR, Lambda_PIA = L_PIA)
-    H_params_only_ISO = dict(T = 7.5, eps = 0.16, Lambda_I = L_I, Lambda_BR =    0, Lambda_PIA =     0)
-    H_params_only_BR  = dict(T = 7.5, eps = 0.16, Lambda_I =   0, Lambda_BR = L_BR, Lambda_PIA =     0)
-    H_params_only_PIA = dict(T = 7.5, eps = 0.16, Lambda_I =   0, Lambda_BR =    0, Lambda_PIA = L_PIA)
-    system = bm.insert_adatoms_randomly(system, shape, density_percent, H_params_only_PIA)
+    H_params = dict(T = 7.5, eps = 0.16, Lambda_I = L_I, Lambda_BR = L_BR, Lambda_PIA = L_PIA, exchange = 0)
+    H_params_only_ISO = dict(T = 7.5, eps = 0.16, Lambda_I = L_I, Lambda_BR =    0, Lambda_PIA =     0, exchange = 0)
+    H_params_only_BR  = dict(T = 7.5, eps = 0.16, Lambda_I =   0, Lambda_BR = L_BR, Lambda_PIA =     0, exchange = 0)
+    H_params_only_PIA = dict(T = 7.5, eps = 0.16, Lambda_I =   0, Lambda_BR =    0, Lambda_PIA = L_PIA, exchange = 0)
+    system = bm.insert_adatoms_randomly(system, shape, density_percent, H_params)
 
 
     ## CALCULATE THE TRANSMISSION COEFFICIENTS
     Bfield = 0
-    syst_params = dict(V=0,   # on-site C-atoms
+    syst_params = dict(eta=eta,
+                    width=shape.width,
+                    V=0,   # on-site C-atoms
                     t=2.6, # hoppings C-atoms
                     phi=0, # PBC hopping phase
                     lambda_iso = 0, # intrinsic soc (nnn-hoppings)
@@ -185,50 +256,17 @@ def main():
                     peierls_lead_R=bm.peierls_lead_R,
                     Lm=0)
 
-    # test_matrices(system, 0.4, syst_params)
 
-    n_energy_values = 101 # MAYBE MORE ENERGY VALUES (CLUSTER?)
+    ############################################################################
+    #                 The Actual Calculation happens down here                 #
+    ############################################################################
+
+    n_phases = 1
+    n_energy_values = 51
     energy_values = np.linspace(-0.4, 0.4, n_energy_values)
-    tau_sx = np.empty_like(energy_values)
-    tau_sy = np.empty_like(energy_values)
-    tau_sz = np.empty_like(energy_values)
+    tau_sx, tau_sy, tau_sz = calculate_relaxation_time(system, energy_values, syst_params, n_phases)
 
-    n_phases = 20 ## MAYBE MORE PHASE VALUES (CLUSTER?)
-    phi_values = np.linspace(0, 2*np.pi, n_phases)
-
-    # energy_test = 0.4
-    # smatrix = kwant.smatrix(system.finalized(), energy_test, params=syst_params)
-    # g_sx, g_sy, g_sz = spin_flip_probability(smatrix)
-
-    CONST = 4 * syst_params['t']/HBAR * eta * shape.width
-
-    for ind in range(n_energy_values):
-        print("Calculating the smatrix for E = {:2.2f} ... ".format(energy_values[ind]), end='')
-        gamma_sx = 0
-        gamma_sy = 0
-        gamma_sz = 0
-        n_phases_with_propag = 0
-
-        for phi in phi_values:
-            syst_params["phi"] = phi
-            smatrix = kwant.smatrix(system.finalized(), energy_values[ind], params=syst_params)
-            g_sx, g_sy, g_sz, modes_per_spin = spin_flip_probability(smatrix)
-            gamma_sx += g_sx
-            gamma_sy += g_sy
-            gamma_sz += g_sz
-
-            if modes_per_spin:
-                n_phases_with_propag += 1
-
-        n_phases_with_propag = max(n_phases_with_propag, 1)
-
-        tau_sx[ind] = CONST * gamma_sx/n_phases_with_propag
-        tau_sy[ind] = CONST * gamma_sy/n_phases_with_propag
-        tau_sz[ind] = CONST * gamma_sz/n_phases_with_propag
-        print("OK")
-
-    # TODO: RUN FOR ONLY-PIA:
-    np.savez("../results/spin_relaxation_times_hydrogenated_20_phases_test_only_PIA.npz",
+    np.savez("../results/spin_relaxation_times_hydrogenated_fast_test.npz",
                                                             energies=energy_values,
                                                             tau_sx=tau_sx,
                                                             tau_sy=tau_sy,

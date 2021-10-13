@@ -296,3 +296,61 @@ With the procedure depicted above, we could describe well the situation when the
 $$
 S_{\text{flip}} = \frac{1}{2} \left\{ S_{\uparrow\Downarrow,\downarrow\Uparrow} + S_{\downarrow\Uparrow,\uparrow\Downarrow} \right\}
 $$
+
+#### More than one magnetic impurities
+
+Once we have implemented the single magnetic impurity case, it is natural to think how one could insert more than one spinful impurities. The first thing we have to notice is that our Hamiltonian will live in a *bigger Hilbert space*: Now we have to consider the fact that different impurities may have spins pointing in different directions, moreover they can be **entangled!!**
+
+The rule is simple, although the implementation might be tricky due to new memory demands:
+
+* Basis of a system with $N$ impurities:
+  $$
+  \begin{bmatrix}
+  \uparrow\\
+  \downarrow
+  \end{bmatrix} \otimes
+  \begin{bmatrix}
+  \Uparrow\\
+  \Downarrow
+  \end{bmatrix}_1 \otimes
+  \begin{bmatrix}
+  \Uparrow\\
+  \Downarrow
+  \end{bmatrix}_2 \otimes \dots \otimes
+  \begin{bmatrix}
+  \Uparrow\\
+  \Downarrow
+  \end{bmatrix}_N =
+  \begin{bmatrix}
+  \uparrow\\
+  \downarrow
+  \end{bmatrix} \otimes
+  \left\{\bigotimes_{i=1}^N
+  \begin{bmatrix}
+  \Uparrow\\
+  \Downarrow
+  \end{bmatrix}_i\right\}
+  $$
+  
+
+Explicitly put, with two impurities our basis will change as follows:
+$$
+\begin{bmatrix}
+\uparrow \Uparrow\\
+\uparrow \Downarrow\\
+\downarrow \Uparrow\\
+\downarrow \Downarrow
+\end{bmatrix}
+\longrightarrow
+\begin{bmatrix}
+\uparrow \Uparrow_{_{1}} \Uparrow_{_{2}}\\
+\uparrow \Uparrow_{_{1}} \Downarrow_{_{2}}\\
+\uparrow \Downarrow_{_{1}} \Uparrow_{_{2}}\\
+\uparrow \Downarrow_{_{1}} \Downarrow_{_{2}}\\
+\downarrow \Uparrow_{_{1}} \Uparrow_{_{2}}\\
+\downarrow \Uparrow_{_{1}} \Downarrow_{_{2}}\\
+\downarrow \Downarrow_{_{1}} \Uparrow_{_{2}}\\
+\downarrow \Downarrow_{_{1}} \Downarrow_{_{2}}\\
+\end{bmatrix}
+$$
+and, accordingly, our on-site and hopping matrices will be modified by another right Kronecker product by a $2\times 2$ identity matrix.   

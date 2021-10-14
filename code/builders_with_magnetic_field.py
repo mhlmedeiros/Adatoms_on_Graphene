@@ -9,7 +9,7 @@ from itertools import product
 #                    Lattice definitions                           #
 #====================================================================#
 ## Matrix Definitions:
-N_SPIN_DEGREE_OF_FREEDOM = 2
+N_SPIN_DEGREE_OF_FREEDOM = 1
 identity = np.identity(N_SPIN_DEGREE_OF_FREEDOM)
 
 s_0 = np.array([[ 1,  0],[ 0, 1]])
@@ -74,10 +74,10 @@ class Rectangle:
         self.delta  = delta
 
         if centered and not pbc:
+            self.x_sup =  length/2
             self.x_inf = -length/2
-            self.x_sup = -self.x_inf
+            self.y_sup =  width/2
             self.y_inf = -width/2
-            self.y_sup = -self.y_inf
         else:
             self.x_inf = 0
             self.x_sup = self.length
@@ -106,13 +106,13 @@ class Rectangle:
 
 ## Limitted region with magnetic field:
 class Bfield:
-   def __init__(self, Bvalue, length=None):
+   def __init__(self, Bvalue, x_Binf=None, x_Bsup=None):
        """
        This class creates functions that return the value for the magnetic
        field depending on x-coordinate. The magnetic field returned is uniform
        inside a symmetrical interval
 
-                -length/2 <= x <= length/2
+                x_Binf <= x <= x_Bsup
 
        and zero otherwise.
 
@@ -121,13 +121,18 @@ class Bfield:
        be made alongside the choice of the gauge.
        """
        self.Bvalue = Bvalue
-       self.length = length
+       self.x_Binf = x_Binf
+       self.x_Bsup = x_Bsup
 
    def __call__(self, x, y):
-       if self.length:
-           return self.Bvalue if np.abs(x) <= self.length/2 else 0
-       else:
-           return self.Bvalue
+        if self.x_Bsup:
+            if self.x_Binf <= x <= self.x_Bsup:
+                B_field = self.Bvalue
+            else:
+                B_field = 0
+        else:
+            B_field = self.Bvalue
+        return self.Bvalue
 
 
 ## Hopping function's builder:
@@ -137,10 +142,10 @@ class HoppingFunction:
         self.simple_hopping_matrix = simple_hopping_matrix
         self.sign = sign
 
-    def __call__(self, site1, site2, t, B, Lm, peierls):
+    def __call__(self, site1, site2, t, x_Binf, x_Bsup, peierls):
         H0 = t * self.simple_hopping_matrix
         HSOC = self.soc_hopping_matrix
-        return self.sign * (H0 + HSOC) * peierls(site1, site2, B, Lm)
+        return self.sign * (H0 + HSOC) * peierls(site1, site2, B, x_Binf, x_Bsup)
 
 
 class ISOHoppingFunction:
@@ -149,10 +154,10 @@ class ISOHoppingFunction:
         self.pia_hopping_matrix = pia_hopping_matrix
         self.sign = sign
 
-    def __call__(self, site1, site2, lambda_iso, B, Lm, peierls):
+    def __call__(self, site1, site2, lambda_iso, B, x_Binf, x_Bsup, peierls):
         H_ISO = lambda_iso * self.isoc_hopping_matrix
         H_PIA = self.pia_hopping_matrix
-        return self.sign *  (H_ISO + H_PIA) * peierls(site1, site2, B, Lm)
+        return self.sign *  (H_ISO + H_PIA) * peierls(site1, site2, B, x_Binf, x_Bsup)
 
 
 class OnSiteZeeman:
@@ -160,9 +165,9 @@ class OnSiteZeeman:
         self.adatom_onsite = adatom_onsite
         self.exchange = exchange
 
-    def __call__(self, site, B, Lm, V):
+    def __call__(self, site, B, x_Binf, x_Bsup, V):
         x, y = site.pos
-        Bfunc = Bfield(Bvalue=B, length=Lm)
+        Bfunc = Bfield(Bvalue=B, x_Binf=x_Binf, x_Bsup=x_Bsup)
         H_Z = g_Lande * Magneton_Bohr/2 * Bfunc(x,y) * sigma_z
         H_J = self.exchange * H_J_matrix
         if self.adatom_onsite:
@@ -195,60 +200,83 @@ def w_to_close_pbc(W):
 #====================================================================#
 
 ## Peierls substitution:
-def simple_hopping(Site1, Site2, t, B, Lm, peierls):
-    return -t * sigma_0 * peierls(Site1, Site2, B, Lm)
+def simple_hopping(Site1, Site2, t, B, x_Binf, x_Bsup, peierls):
+    return -t * sigma_0 * peierls(Site1, Site2, B, x_Binf, x_Bsup)
 
 
-def hopping_pbc(Site1, Site2, t, phi):
-    return -t * sigma_0 * np.exp(-1j*phi)
+def hopping_pbc(Site1, Site2, t, phi, B, x_Binf, x_Bsup):
+    return -t * sigma_0 * np.exp(-1j*phi) * peierls_pbc(Site1, Site2, B, x_Binf, x_Bsup)
 
 
-def peierls_scatter(Site1, Site2, B, Lm):
+def peierls_scatter(Site1, Site2, B, x_Binf, x_Bsup):
     """
     This phase factor correspond to the gauge where the magnetic
     field is limitted to a interval inside the scattering region.
     """
     (x_i, y_i) = Site1.pos # Target
     (x_j, y_j) = Site2.pos # Source
-    if Lm:
-        x_i, x_j = change_x(x_i, Lm), change_x(x_j, Lm)
+    if x_Bsup:
+        x_i, x_j = change_x(x_i, x_Binf, x_Bsup), change_x(x_j, x_Binf, x_Bsup)
         theta = B/2 * (x_i + x_j) * (y_i - y_j)
     else:
         theta = -B/2 * (x_i - x_j) * (y_i + y_j)
     return np.exp(2j*np.pi*theta)
 
 
-def peierls_lead_L(Site1, Site2, B, Lm):
+def peierls_pbc(Site1, Site2, B, x_Binf, x_Bsup):
+    """
+    This phase factor correspond to the gauge where the magnetic
+    field is limitted to a interval inside the scattering region.
+    """
+    (x_i, y_i) = Site1.pos # Target
+    (x_j, y_j) = Site2.pos # Source
+    x_i, x_j = change_x(x_i, x_Binf, x_Bsup), change_x(x_j, x_Binf, x_Bsup)
+    theta = B/2 * (x_i + x_j) * 1/np.sqrt(3)
+    return np.exp(2j*np.pi*theta)
+
+
+def peierls_lead_L(Site1, Site2, B, x_Binf, x_Bsup):
     """
     When 'peierls_scatter' is used, this has to be the
     the phase factor for left-hand lead.
     """
     (x_i, y_i) = Site1.pos # Target
     (x_j, y_j) = Site2.pos # Source
-    if Lm: theta = B/2 * Lm * (y_i - y_j)
-    else: theta = -B/2 * (x_i - x_j) * (y_i + y_j)
+
+    if x_Binf:
+        theta = B/2 * (2 * x_Binf) * (y_i - y_j)
+    else:
+        theta = -B/2 * (x_i - x_j) * (y_i + y_j)
+
     return np.exp(2j*np.pi*theta)
 
 
-def peierls_lead_R(Site1, Site2, B, Lm):
+def peierls_lead_R(Site1, Site2, B, x_Binf, x_Bsup):
     """
     When 'peierls_scatter' is used, this has to be the
     the phase factor for right-hand lead.
     """
     (x_i, y_i) = Site1.pos # Target
     (x_j, y_j) = Site2.pos # Source
-    if Lm: theta = B/2 * Lm * (y_i - y_j)
-    else: theta = -B/2 * (x_i - x_j) * (y_i + y_j)
+
+    if x_Bsup:
+        theta = B/2 * (2 * x_Bsup) * (y_i - y_j)
+    else:
+        theta = -B/2 * (x_i - x_j) * (y_i + y_j)
+
     return np.exp(-2j*np.pi*theta)
 
 
-def change_x(x, Lm):
-    if Lm:
-        if (-Lm/2) <= x <= (Lm/2): x_transformed = x
-        elif x > (Lm/2): x_transformed = Lm/2
-        else: x_transformed = -Lm/2
-    else:
+def change_x(x, x_Binf, x_Bsup):
+    # if Lm:
+    if x_Binf <= x <= x_Bsup:
         x_transformed = x
+    elif x > x_Bsup:
+        x_transformed = x_Bsup
+    else:
+        x_transformed = x_Binf
+    # else:
+    #     x_transformed = x
     return x_transformed
 
 
@@ -436,6 +464,7 @@ def include_ISOC(system, G_sub_lattices):
     system[kwant.builder.HoppingKind((1,0), sub_b, sub_b)]  = H_isoc_p
     system[kwant.builder.HoppingKind((0,1), sub_b, sub_b)]  = H_isoc_p
     system[kwant.builder.HoppingKind((-1,1), sub_b, sub_b)] = H_isoc_m
+
 
 ## INSERTING ADATOMS:
 def insert_adatom(syst, pos_tag, sub_lat, eps_H=1, T=1, L_I=1, L_BR=1, L_PIA=1):
@@ -653,12 +682,13 @@ def calculate_conductance(syst, energy_values, params_dict):
         data.append(smatrix.transmission(1, 0))
     return np.array(data)
 
+
 #====================================================================#
 #                               Main                                 #
 #====================================================================#
 def main():
     ## Define the shape of the system:
-    shape = Rectangle(width=5, length=5, pbc=True)
+    shape = Rectangle(width=5, length=5, delta=1, pbc=True)
 
     ## Build the scattering region:
     system = make_graphene_strip(graphene, shape)
@@ -698,7 +728,8 @@ def main():
                            phi = 0,
                            lambda_iso = 12e-6,
                            B = Bfield,
-                           Lm = 3,
+                           x_Binf = 1,
+                           x_Bsup = 4,
                            peierls = peierls_scatter,
                            peierls_lead_L = peierls_lead_L,
                            peierls_lead_R = peierls_lead_R)
@@ -718,51 +749,51 @@ def main():
     ## THE EXTRA DIVISION BY 2 REQUIRES CLARIFICATION, BUT IT HAS TO DO WITH THE DENSITY MATRIX
     ## OF AN UNPOLARIZED SYSTEM \rho =  1/2 |UP)(UP| + 1/2 |DN)(DN|
     ## ADOPTED WHEN TRANCING OUT THE IMPURITY SPIN DEGREE OF FREEDOM:
-    T_up_up = np.linalg.norm(1/2 * (smatrix.submatrix((1,0), (0,0)) + smatrix.submatrix((1,1), (0,1))))**2 * 1/modes_per_spin
-    T_up_dn = np.linalg.norm(smatrix.submatrix((1,0), (0,2)) + smatrix.submatrix((1,1), (0,3)))**2/2/modes_per_spin
-    T_dn_up = np.linalg.norm(smatrix.submatrix((1,2), (0,0)) + smatrix.submatrix((1,3), (0,1)))**2/2/modes_per_spin
-    T_dn_dn = np.linalg.norm(smatrix.submatrix((1,2), (0,2)) + smatrix.submatrix((1,3), (0,3)))**2/2/modes_per_spin
-    print("\nT_sz = \n[[{:.3f}, {:.3f}],\n[{:.3f}, {:.3f}]]".format(T_up_up, T_up_dn, T_dn_up, T_dn_dn))
+    # T_up_up = np.linalg.norm(1/2 * (smatrix.submatrix((1,0), (0,0)) + smatrix.submatrix((1,1), (0,1))))**2 * 1/modes_per_spin
+    # T_up_dn = np.linalg.norm(smatrix.submatrix((1,0), (0,2)) + smatrix.submatrix((1,1), (0,3)))**2/2/modes_per_spin
+    # T_dn_up = np.linalg.norm(smatrix.submatrix((1,2), (0,0)) + smatrix.submatrix((1,3), (0,1)))**2/2/modes_per_spin
+    # T_dn_dn = np.linalg.norm(smatrix.submatrix((1,2), (0,2)) + smatrix.submatrix((1,3), (0,3)))**2/2/modes_per_spin
+    # print("\nT_sz = \n[[{:.3f}, {:.3f}],\n[{:.3f}, {:.3f}]]".format(T_up_up, T_up_dn, T_dn_up, T_dn_dn))
+    #
+    # R_up_up = np.linalg.norm(smatrix.submatrix((0,0), (0,0)) + smatrix.submatrix((0,1), (0,1)))**2/2/modes_per_spin
+    # R_up_dn = np.linalg.norm(smatrix.submatrix((0,0), (0,2)) + smatrix.submatrix((0,1), (0,3)))**2/2/modes_per_spin
+    # R_dn_up = np.linalg.norm(smatrix.submatrix((0,2), (0,0)) + smatrix.submatrix((0,3), (0,1)))**2/2/modes_per_spin
+    # R_dn_dn = np.linalg.norm(smatrix.submatrix((0,2), (0,2)) + smatrix.submatrix((0,3), (0,3)))**2/2/modes_per_spin
+    # print("\nR_sz = \n[[{:.3f}, {:.3f}],\n[{:.3f}, {:.3f}]]".format(R_up_up, R_up_dn, R_dn_up, R_dn_dn))
+    #
+    # total_transmission = smatrix.transmission(1,0)
+    # total_reflection = smatrix.transmission(0,0)
+    # propagating_modes = 1 #smatrix.num_propagating(0)/4
 
-    R_up_up = np.linalg.norm(smatrix.submatrix((0,0), (0,0)) + smatrix.submatrix((0,1), (0,1)))**2/2/modes_per_spin
-    R_up_dn = np.linalg.norm(smatrix.submatrix((0,0), (0,2)) + smatrix.submatrix((0,1), (0,3)))**2/2/modes_per_spin
-    R_dn_up = np.linalg.norm(smatrix.submatrix((0,2), (0,0)) + smatrix.submatrix((0,3), (0,1)))**2/2/modes_per_spin
-    R_dn_dn = np.linalg.norm(smatrix.submatrix((0,2), (0,2)) + smatrix.submatrix((0,3), (0,3)))**2/2/modes_per_spin
-    print("\nR_sz = \n[[{:.3f}, {:.3f}],\n[{:.3f}, {:.3f}]]".format(R_up_up, R_up_dn, R_dn_up, R_dn_dn))
-
-    total_transmission = smatrix.transmission(1,0)
-    total_reflection = smatrix.transmission(0,0)
-    propagating_modes = 1 #smatrix.num_propagating(0)/4
-
-    print(f"\nNumber of propagating modes = {smatrix.num_propagating(0)}")
-    print(f"Total transmission = {total_transmission}")
-    print(f"Total reflection = {total_reflection}")
-    print(f"T + R = {total_transmission + total_reflection}\n")
-
-
-    T_upUp_upUp = smatrix.transmission((1,0),(0,0))/propagating_modes
-    R_upUp_upUp = smatrix.transmission((0,0),(0,0))/propagating_modes
-
-    T_upDn_upDn = smatrix.transmission((1,1),(0,1))/propagating_modes
-    R_upDn_upDn = smatrix.transmission((0,1),(0,1))/propagating_modes
-
-    T_dnUp_dnUp = smatrix.transmission((1,2),(0,2))/propagating_modes
-    R_dnUp_dnUp = smatrix.transmission((0,2),(0,2))/propagating_modes
-
-    T_dnDn_dnDn = smatrix.transmission((1,3),(0,3))/propagating_modes
-    R_dnDn_dnDn = smatrix.transmission((0,3),(0,3))/propagating_modes
-
-    print("T_upUp_upUp = {:.3f}\nR_upUp_upUp = {:.3f}\n".format(T_upUp_upUp, R_upUp_upUp))
-    print("T_upUp_upUp + R_upUp_upUp = {:.3f}\n".format(T_upUp_upUp + R_upUp_upUp))
-
-    print("T_upDn_upDn = {:.3f}\nR_upDn_upDn = {:.3f}\n".format(T_upDn_upDn, R_upDn_upDn))
-    print("T_upDn_upDn + R_upDn_upDn = {:.3f}\n".format(T_upDn_upDn + R_upDn_upDn))
-
-    print("T_dnUp_dnUp = {:.3f}\nR_dnUp_dnUp = {:.3f}\n".format(T_dnUp_dnUp, R_dnUp_dnUp))
-    print("T_dnUp_dnUp + R_dnUp_upUp = {:.3f}\n".format(T_dnUp_dnUp + R_dnUp_dnUp))
-
-    print("T_dnDn_dnDn = {:.3f}\nR_dnDn_dnDn = {:.3f}\n".format(T_dnDn_dnDn, R_dnDn_dnDn))
-    print("T_dnDn_upDn + R_dnDn_upDn = {:.3f}\n".format(T_dnDn_dnDn + R_dnDn_dnDn))
+    # print(f"\nNumber of propagating modes = {smatrix.num_propagating(0)}")
+    # print(f"Total transmission = {total_transmission}")
+    # print(f"Total reflection = {total_reflection}")
+    # print(f"T + R = {total_transmission + total_reflection}\n")
+    #
+    #
+    # T_upUp_upUp = smatrix.transmission((1,0),(0,0))/propagating_modes
+    # R_upUp_upUp = smatrix.transmission((0,0),(0,0))/propagating_modes
+    #
+    # T_upDn_upDn = smatrix.transmission((1,1),(0,1))/propagating_modes
+    # R_upDn_upDn = smatrix.transmission((0,1),(0,1))/propagating_modes
+    #
+    # T_dnUp_dnUp = smatrix.transmission((1,2),(0,2))/propagating_modes
+    # R_dnUp_dnUp = smatrix.transmission((0,2),(0,2))/propagating_modes
+    #
+    # T_dnDn_dnDn = smatrix.transmission((1,3),(0,3))/propagating_modes
+    # R_dnDn_dnDn = smatrix.transmission((0,3),(0,3))/propagating_modes
+    #
+    # print("T_upUp_upUp = {:.3f}\nR_upUp_upUp = {:.3f}\n".format(T_upUp_upUp, R_upUp_upUp))
+    # print("T_upUp_upUp + R_upUp_upUp = {:.3f}\n".format(T_upUp_upUp + R_upUp_upUp))
+    #
+    # print("T_upDn_upDn = {:.3f}\nR_upDn_upDn = {:.3f}\n".format(T_upDn_upDn, R_upDn_upDn))
+    # print("T_upDn_upDn + R_upDn_upDn = {:.3f}\n".format(T_upDn_upDn + R_upDn_upDn))
+    #
+    # print("T_dnUp_dnUp = {:.3f}\nR_dnUp_dnUp = {:.3f}\n".format(T_dnUp_dnUp, R_dnUp_dnUp))
+    # print("T_dnUp_dnUp + R_dnUp_upUp = {:.3f}\n".format(T_dnUp_dnUp + R_dnUp_dnUp))
+    #
+    # print("T_dnDn_dnDn = {:.3f}\nR_dnDn_dnDn = {:.3f}\n".format(T_dnDn_dnDn, R_dnDn_dnDn))
+    # print("T_dnDn_upDn + R_dnDn_upDn = {:.3f}\n".format(T_dnDn_dnDn + R_dnDn_dnDn))
 
 
 if __name__ == '__main__':

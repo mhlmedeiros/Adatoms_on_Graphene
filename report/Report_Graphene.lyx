@@ -82,7 +82,366 @@ Introduction
 \end_layout
 
 \begin_layout Subsection
+Ladauer formula
+\end_layout
+
+\begin_layout Standard
+When it comes to large systems, the conductance is well described by the
+ Ohm's law
+\end_layout
+
+\begin_layout Standard
+\begin_inset Formula 
+\[
+G=\frac{\sigma W}{L}.
+\]
+
+\end_inset
+
+However, in the realm of nanoscopic (or even mesoscopic) systems this expression
+ needs to be revisited.
+ The relevant points in this scenario are
+\end_layout
+
+\begin_layout Itemize
+Interface resistance, which is independent of the length of the system (
+\begin_inset Formula $L$
+\end_inset
+
+).
+\end_layout
+
+\begin_layout Itemize
+Number of transverse modes in the conductor, that decreases in discrete
+ steps as the width of the system goes down.
+\end_layout
+
+\begin_layout Standard
+The Landauer formula gives us the conductance while takes care of both features
+ above:
+\end_layout
+
+\begin_layout Standard
+\begin_inset Formula 
+\[
+G=\frac{2e^{2}}{h}MT
+\]
+
+\end_inset
+
+Where 
+\begin_inset Formula $M$
+\end_inset
+
+ is the number of modes of the conductor, 
+\begin_inset Formula $T$
+\end_inset
+
+ is the average transmission probability.
+ 
+\end_layout
+
+\begin_layout Subsection
 Weak localization
+\end_layout
+
+\begin_layout Itemize
+Ohm's law states that the resistance increases with the length of the array
+ of scatters.
+ This is appropriate for classical systems, where the phase-relaxation length
+ is shorter than the distance between successive scatterers.
+\end_layout
+
+\begin_layout Itemize
+At low temperatures in low-mobility systems the scenario is rather different.
+ The phase-relaxation length can be much larger than the mean free path.
+ In these phase-coherent systems there is interference that lead to a decrease
+ in the conductance.
+\end_layout
+
+\begin_layout Itemize
+For systems with overall conductance much higher than 
+\begin_inset Formula $\sim(e^{2}/\hbar)$
+\end_inset
+
+ or 40 
+\begin_inset Formula $\mu\Omega^{-1}$
+\end_inset
+
+, such a decrease is approximately 
+\begin_inset Formula $(e^{2}/\hbar)$
+\end_inset
+
+.
+ Such a system is said to be in the 
+\begin_inset ERT
+status open
+
+\begin_layout Plain Layout
+
+
+\backslash
+textbf{weak localization regime}
+\end_layout
+
+\end_inset
+
+.
+\end_layout
+
+\begin_layout Itemize
+The weak localization effect is easily destroyed by a small magnetic field
+ (less than 100 G), so that it can be identified by its characteristic magnetore
+sistance.
+\end_layout
+
+\begin_layout Subsubsection
+Localization length
+\end_layout
+
+\begin_layout Standard
+If the interference between successive scatterers is neglected, the transmission
+ probability through an array of length 
+\begin_inset Formula $L$
+\end_inset
+
+ goes down with the length:
+\end_layout
+
+\begin_layout Standard
+\begin_inset Formula 
+\begin{equation}
+T(L)=\frac{L_{0}}{L+L_{0}},
+\end{equation}
+
+\end_inset
+
+where 
+\begin_inset Formula $L_{0}$
+\end_inset
+
+ is of order of a mean free path.
+ This leads to a resistance that increases linearly with the length of the
+ array in accordance with Ohm's law:
+\end_layout
+
+\begin_layout Standard
+\begin_inset Formula 
+\begin{equation}
+\rho(L)=\frac{1}{M}\frac{1-T(L)}{T(L)}=\frac{L}{ML_{0}},\label{eq:resistance_without_interference}
+\end{equation}
+
+\end_inset
+
+where we are using 
+\begin_inset Formula $\rho$
+\end_inset
+
+ to denote the normalized resistance (in units of 
+\begin_inset Formula $h/2e^{2}$
+\end_inset
+
+), and 
+\begin_inset Formula $M$
+\end_inset
+
+ is the number of modes.
+ The inclusion of interference is conceptually more complicated since the
+ configuration of the scatteres and the electron wavefunction play important
+ rules in this case.
+ In this way, the quantum version of the resistance 
+\begin_inset Formula $\rho(L)$
+\end_inset
+
+ have to be defined as an average over an ensemble of conductors with the
+ same number of scatterers with different configurations.
+\end_layout
+
+\begin_layout Standard
+Considering an single-moded conductor with two scatterers, each of which
+ with transmissions probabilities given by 
+\begin_inset Formula $T_{1}$
+\end_inset
+
+ and 
+\begin_inset Formula $T_{2}$
+\end_inset
+
+ we have:
+\end_layout
+
+\begin_layout Itemize
+The transmission through the combination:
+\end_layout
+
+\begin_layout Standard
+\begin_inset Formula 
+\begin{equation}
+T=|t|^{2}=\frac{T_{1}T_{2}}{1-2\sqrt{R_{1}R_{2}}\cos\theta+R_{1}R_{2}},
+\end{equation}
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+with 
+\begin_inset Formula $\theta$
+\end_inset
+
+ being the phase shift acquired in one round-trip between the scatterers.
+\end_layout
+
+\begin_layout Itemize
+The ensemble-averaged resistance is given by
+\begin_inset Formula 
+\begin{equation}
+\rho_{12}=\left\langle \frac{1-T}{T}\right\rangle =\frac{1}{2\pi}\int\frac{1+R_{1}R_{2}-T_{1}T_{2}-2\sqrt{R_{1}R_{2}}\cos\theta}{T_{1}T_{2}}=\frac{1+R_{1}R_{2}-T_{1}T_{2}}{T_{1}T_{2}}
+\end{equation}
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Itemize
+If we define the resistance of an individual scatterer as 
+\end_layout
+
+\begin_layout Standard
+\begin_inset Formula 
+\[
+\rho_{j}=\frac{1-T_{j}}{T_{j}}
+\]
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+we can write
+\end_layout
+
+\begin_layout Standard
+\begin_inset Formula 
+\begin{equation}
+\rho_{12}=\rho_{1}+\rho_{2}+2\rho_{1}\rho_{2}\label{eq:resistance_of_series_of_2_scatterers}
+\end{equation}
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Now, if we add a short section of length 
+\begin_inset Formula $\Delta L$
+\end_inset
+
+ to a section of length 
+\begin_inset Formula $L$
+\end_inset
+
+ we'll have
+\end_layout
+
+\begin_layout Standard
+\begin_inset Formula 
+\[
+\rho_{1}=\rho(L)\text{ and }\rho_{2}=\frac{\Delta L}{L_{0}},
+\]
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+then, from Eq.
+\begin_inset CommandInset ref
+LatexCommand ref
+reference "eq:resistance_of_series_of_2_scatterers"
+
+\end_inset
+
+ we have
+\end_layout
+
+\begin_layout Standard
+\begin_inset Formula 
+\[
+\rho(L+\Delta L)=\rho(L)+[1+2\rho(L)]\frac{\Delta L}{L_{0}}
+\]
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+which leads to the differential equation
+\end_layout
+
+\begin_layout Standard
+\begin_inset Formula 
+\[
+\frac{d\rho}{dL}\simeq\frac{\rho(L+\Delta L)-\rho(L)}{\Delta L}=\frac{1+2\rho}{L_{0}}
+\]
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+with solution given by
+\end_layout
+
+\begin_layout Standard
+\begin_inset Formula 
+\begin{equation}
+\rho(L)=\frac{1}{2}[e^{2L/L_{0}}-1]
+\end{equation}
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Notice that the resistance increases exponentially with the length, instead
+ of linearly as predicted by Ohm's law.
+ This is also true for multi-moded system as shown by Thouless [PRL, 39,
+ 1167 (1977)] if it is long enough for its reistance be 
+\begin_inset Formula $\sim(h/2e^{2})$
+\end_inset
+
+, in other words (by Eq.
+ 
+\begin_inset CommandInset ref
+LatexCommand ref
+reference "eq:resistance_without_interference"
+
+\end_inset
+
+), the length of the system have to exceed 
+\begin_inset Formula $ML_{0}$
+\end_inset
+
+, this is the localization length:
+\end_layout
+
+\begin_layout Standard
+\begin_inset Formula 
+\begin{equation}
+L_{c}=ML_{0}\label{eq:localization_length}
+\end{equation}
+
+\end_inset
+
+
 \end_layout
 
 \begin_layout Section
@@ -371,6 +730,11 @@ The second term indicates the adatom-induced intrinsic SOC, and it's strength
 
 ).
  It couples the same spin in the same sublattice.
+ 
+\begin_inset Formula $\Lambda_{I}=-0.21$
+\end_inset
+
+ meV
 \end_layout
 
 \begin_layout Itemize
@@ -486,9 +850,10 @@ where the Peierls phase is defined by
 
 \begin_layout Standard
 \begin_inset Formula 
-\begin{equation}
-\phi_{ij}=\frac{e}{\hbar}\int_{\mathbf{r}_{i}}^{\mathbf{r}_{j}}\mathbf{A}\cdot d\mathbf{l}
-\end{equation}
+\begin{align}
+\phi_{ij} & =\frac{e}{\hbar}\int_{\mathbf{r}_{i}}^{\mathbf{r}_{j}}\mathbf{A}\cdot d\mathbf{l}\\
+ & =2\pi\frac{1}{\phi_{0}}\int_{\mathbf{r}_{i}}^{\mathbf{r}_{j}}\mathbf{A}\cdot d\mathbf{l}
+\end{align}
 
 \end_inset
 
@@ -501,7 +866,113 @@ with
 \end_inset
 
  the position of the i-th atom.
- To get a zero magnetic field in the leads, and a magnetic field pointing
+ Calling the quantity 
+\begin_inset Formula $h/e=\phi_{0}$
+\end_inset
+
+ the quanta of magnetic flux, we can see that the total phase gained in
+ a closed loop is given by
+\end_layout
+
+\begin_layout Standard
+\begin_inset Formula 
+\begin{align*}
+\Phi_{loop} & =\frac{2\pi}{\phi_{0}}\oint_{\partial S}\mathbf{A}\cdot d\mathbf{l}\\
+ & =\frac{2\pi}{\phi_{0}}\int_{S}(\nabla\times\mathbf{A})\cdot d\mathbf{S}\\
+ & =\frac{2\pi}{\phi_{0}}\int_{S}B\cdot d\mathbf{S}\\
+ & =2\pi\frac{\phi_{S}}{\phi_{0}},
+\end{align*}
+
+\end_inset
+
+where 
+\begin_inset Formula $\phi_{S}$
+\end_inset
+
+ is the magnetic flux through the area bounded by the loop.
+\end_layout
+
+\begin_layout Standard
+\begin_inset Float figure
+wide false
+sideways false
+status open
+
+\begin_layout Plain Layout
+\align center
+\begin_inset Graphics
+	filename /home/marcos/Documents/DAAD_Research/quantum_transport/hydrogenated_graphene/images/zigzag_lead_Hofstadter_butterfly.png
+	width 80col%
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Plain Layout
+\begin_inset Caption Standard
+
+\begin_layout Plain Layout
+Hofstadter butterfly for a hexagonal lattice with translational invariance
+ in the x-direction with zigzag edges.
+ 
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Plain Layout
+
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\begin_inset Float figure
+wide false
+sideways false
+status open
+
+\begin_layout Plain Layout
+\align center
+\begin_inset Graphics
+	filename /home/marcos/Documents/DAAD_Research/quantum_transport/hydrogenated_graphene/images/arm_chair_lead_Hofstadter_butterfly.png
+	width 80col%
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Plain Layout
+\begin_inset Caption Standard
+
+\begin_layout Plain Layout
+Hofstadter butterfly for a hexagonal lattice with translational invariance
+ in the y-direction with armchair edges.
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Plain Layout
+
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+To get a zero magnetic field in the leads, and a magnetic field pointing
  in z-direction we adopt the Landau gauge given by
 \end_layout
 

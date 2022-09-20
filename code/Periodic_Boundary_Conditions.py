@@ -95,7 +95,7 @@ def make_system(N1=10, N2=20, pot=0, t=2.6):
 
     return syst
 
-def insert_adatoms_soc(system, n_cells_a1, n_cells_a2, adatom_concentration, params):
+def insert_adatoms_randomly_pbc(system, n_cells_a1, n_cells_a2, adatom_concentration, params):
 
     ## INSERTING ADATOMS:
     test_pbc = Permition_PBC(n_cells_a1, n_cells_a2, delta=2)
@@ -353,16 +353,13 @@ def include_all_ASO(system, all_CH_sites, all_NNN_neighbors, Lambda_I=1):
 
 def include_all_BR(system, all_CH_sites, all_NN_neighbors, Lambda_BR=1):
     for CH_site, NN_sites in zip(all_CH_sites, all_NN_neighbors):
-        # print(len(NN_sites))
         for NN_site in NN_sites:
-            # print(NN_site)
             include_BR_sitewise(system, CH_site, NN_site, Lambda_BR)
 
 def include_all_PIA(system, all_NN_neighbors, Lambda_PIA=1, iso=True):
     for NN_sites in all_NN_neighbors:
         targets = [NN_sites[(i+1)%3] for i in range(3)]
         for site1, site2 in zip(targets, NN_sites):
-            # print(site1, '<--', site2)
             include_PIA_sitewise(system, site1, site2, Lambda_PIA, iso)
 
 
@@ -482,7 +479,7 @@ def main():
     ## INSERTING ADATOMS:
     adatom_H_params = dict(T = 7.5, eps = 0.16, Lambda_I = -0.21e-3, Lambda_BR = 0.33e-3, Lambda_PIA = -0.77e-3)
     adatom_F_params = dict(T = 5.5, eps = -2.2, Lambda_I = 3.3e-3, Lambda_BR = 11.2e-3, Lambda_PIA = -7.3e-3)
-    system = insert_adatoms_soc(system, n_cells_a1, n_cells_a2, adatom_concentration, params=adatom_F_params)
+    system = insert_adatoms_randomly_pbc(system, n_cells_a1, n_cells_a2, adatom_concentration, params=adatom_F_params)
     # system = insert_adatoms(system, adatom_concentration, n_cells_a1, n_cells_a2)
 
     density_adatoms = dos_kpm(system, energies, resolution=0.03)

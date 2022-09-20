@@ -44,8 +44,8 @@ def site_size_function(site):
         size = 0.1
     return size
 
-def plot_system(system):
-    fig, ax = plt.subplots(figsize=(20,5))
+def plot_system(system, ax=None):
+    if not ax: fig, ax = plt.subplots(figsize=(20,5))
     kwant.plot(system,
                site_color=family_colors_H,
                site_size=site_size_function,

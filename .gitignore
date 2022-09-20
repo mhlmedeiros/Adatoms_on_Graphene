@@ -1,0 +1,5 @@
+# ignore results of computation
+*.npz
+# ignore python cache
+*.pyc
+*.ipynb_checkpoints

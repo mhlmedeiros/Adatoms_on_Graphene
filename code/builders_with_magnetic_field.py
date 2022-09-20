@@ -142,7 +142,7 @@ class HoppingFunction:
         self.simple_hopping_matrix = simple_hopping_matrix
         self.sign = sign
 
-    def __call__(self, site1, site2, t, x_Binf, x_Bsup, peierls):
+    def __call__(self, site1, site2, t, B, x_Binf, x_Bsup, peierls):
         H0 = t * self.simple_hopping_matrix
         HSOC = self.soc_hopping_matrix
         return self.sign * (H0 + HSOC) * peierls(site1, site2, B, x_Binf, x_Bsup)
@@ -190,7 +190,7 @@ class SiteTest:
 
 
 def w_to_close_pbc(W):
-    N = int(max(W // np.sqrt(3), 2))
+    N = int(max(W // np.sqrt(3), 1))
     w_new = N * np.sqrt(3)
     return w_new, N
 
@@ -204,7 +204,7 @@ def simple_hopping(Site1, Site2, t, B, x_Binf, x_Bsup, peierls):
     return -t * sigma_0 * peierls(Site1, Site2, B, x_Binf, x_Bsup)
 
 
-def hopping_pbc(Site1, Site2, t, phi, B, x_Binf, x_Bsup):
+def hopping_pbc(Site1, Site2, t, phi, B, x_Binf, x_Bsup, peierls_pbc):
     return -t * sigma_0 * np.exp(-1j*phi) * peierls_pbc(Site1, Site2, B, x_Binf, x_Bsup)
 
 
@@ -215,7 +215,7 @@ def peierls_scatter(Site1, Site2, B, x_Binf, x_Bsup):
     """
     (x_i, y_i) = Site1.pos # Target
     (x_j, y_j) = Site2.pos # Source
-    if x_Bsup:
+    if x_Binf or x_Bsup:
         x_i, x_j = change_x(x_i, x_Binf, x_Bsup), change_x(x_j, x_Binf, x_Bsup)
         theta = B/2 * (x_i + x_j) * (y_i - y_j)
     else:
@@ -230,7 +230,8 @@ def peierls_pbc(Site1, Site2, B, x_Binf, x_Bsup):
     """
     (x_i, y_i) = Site1.pos # Target
     (x_j, y_j) = Site2.pos # Source
-    x_i, x_j = change_x(x_i, x_Binf, x_Bsup), change_x(x_j, x_Binf, x_Bsup)
+    if x_Binf or x_Bsup:
+        x_i, x_j = change_x(x_i, x_Binf, x_Bsup), change_x(x_j, x_Binf, x_Bsup)
     theta = B/2 * (x_i + x_j) * 1/np.sqrt(3)
     return np.exp(2j*np.pi*theta)
 
@@ -243,7 +244,7 @@ def peierls_lead_L(Site1, Site2, B, x_Binf, x_Bsup):
     (x_i, y_i) = Site1.pos # Target
     (x_j, y_j) = Site2.pos # Source
 
-    if x_Binf:
+    if x_Binf or x_Bsup:
         theta = B/2 * (2 * x_Binf) * (y_i - y_j)
     else:
         theta = -B/2 * (x_i - x_j) * (y_i + y_j)
@@ -259,12 +260,30 @@ def peierls_lead_R(Site1, Site2, B, x_Binf, x_Bsup):
     (x_i, y_i) = Site1.pos # Target
     (x_j, y_j) = Site2.pos # Source
 
-    if x_Bsup:
+    if x_Binf or x_Bsup:
         theta = B/2 * (2 * x_Bsup) * (y_i - y_j)
     else:
         theta = -B/2 * (x_i - x_j) * (y_i + y_j)
 
-    return np.exp(-2j*np.pi*theta)
+    return np.exp(2j*np.pi*theta)
+
+
+def peierls_pbc_L(Site1, Site2, B, x_Binf, x_Bsup):
+    """
+    This phase factor correspond to the gauge where the magnetic
+    field is limitted to a interval inside the scattering region.
+    """
+    theta = B/2 * (2 * x_Binf) * (-1/np.sqrt(3))
+    return np.exp(2j*np.pi*theta)
+
+
+def peierls_pbc_R(Site1, Site2, B, x_Binf, x_Bsup):
+    """
+    This phase factor correspond to the gauge where the magnetic
+    field is limitted to a interval inside the scattering region.
+    """
+    theta = B/2 * (2 * x_Bsup) * (-1/np.sqrt(3))
+    return np.exp(2j*np.pi*theta)
 
 
 def change_x(x, x_Binf, x_Bsup):
@@ -438,8 +457,13 @@ def make_graphene_leads(lattice, shape):
         include_ISOC(lead_0, [A,B])
 
     lead_1 = lead_0.reversed()
+
     lead_0 = lead_0.substituted(peierls='peierls_lead_L')
     lead_1 = lead_1.substituted(peierls='peierls_lead_R')
+
+    if shape.pbc:
+        lead_0 = lead_0.substituted(peierls_pbc='peierls_pbc_L')
+        lead_1 = lead_1.substituted(peierls_pbc='peierls_pbc_R')
 
     return [lead_0, lead_1]
 
@@ -498,17 +522,17 @@ def insert_adatom(syst, pos_tag, sub_lat, eps_H=1, T=1, L_I=1, L_BR=1, L_PIA=1):
         include_PIA_sitewise(syst, site1, site2, Lambda_PIA=L_PIA)
 
 
-def insert_adatoms_randomly(system, shape, adatom_concentration, adatom_params):
+def insert_adatoms_randomly(system, shape, adatom_concentration, adatom_params, verbatim=True):
     """
     It is the almost the same function defined in "Periodic_Boundary_Conditions.py",
     located in this same directory.
     """
     ## INSERTING ADATOMS:
-    print("Collecting the allowed sites to place adatoms...", end=' ')
+    if verbatim: print("Collecting the allowed sites to place adatoms...", end=' ')
     allowed_sites = [site for site in system.sites() if shape.is_allowed(site)]
-    print("OK")
+    if verbatim: print("OK")
 
-    print("Inserting adatoms randomly...", end=' ')
+    if verbatim: print("Inserting adatoms randomly...", end=' ')
     n_Carbon_sites = len(system.sites())
     n_Hydrogen_sites = int(n_Carbon_sites // (100/adatom_concentration))
     number_of_adatoms = max(1, n_Hydrogen_sites)
@@ -536,9 +560,7 @@ def insert_adatoms_randomly(system, shape, adatom_concentration, adatom_params):
         system[HB(*tagB)] = on_site_adatom     # on-site
         system[B(*tagB), HB(*tagB)] = sigma_0 * T # hopping with C_H
 
-    print("OK")
-
-    print("Considering the SOC terms...", end=" ")
+    if verbatim: print("OK\nConsidering the SOC terms...", end=" ")
     ## Calculate and include the Adatom induced spin-orbit coupling (ASO)
     include_all_ASO(system, CH_sites, all_NNN_neighbors, Lambda_I=adatom_params['Lambda_I'])
 
@@ -547,7 +569,7 @@ def insert_adatoms_randomly(system, shape, adatom_concentration, adatom_params):
 
     ## Calculate and include into the system the Pseudo-spin inversion asymmetry spin-orbit coupling (PIA)
     include_all_PIA(system, all_NN_neighbors, Lambda_PIA=adatom_params['Lambda_PIA'])
-    print("OK")
+    if verbatim: print("OK")
     # print("Formating sites for plotting...", end=' ')
     # format_sites_3 = FormatMapSites(allowed_sites, CH_sites)
     # print("OK")
@@ -731,8 +753,11 @@ def main():
                            x_Binf = 1,
                            x_Bsup = 4,
                            peierls = peierls_scatter,
+                           peierls_pbc = peierls_pbc,
                            peierls_lead_L = peierls_lead_L,
-                           peierls_lead_R = peierls_lead_R)
+                           peierls_pbc_L = peierls_pbc_L,
+                           peierls_lead_R = peierls_lead_R,
+                           peierls_pbc_R = peierls_pbc_R)
     # energy_values = np.linspace(-5, 5, 300)
     # transmission1 = calculate_conductance(system, energy_values,
     #                                      params_dict=parameters_hand)
